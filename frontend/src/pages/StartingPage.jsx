@@ -4,6 +4,7 @@ import CardNav from "../components/CardNav";
 import VariableProximity from "../components/VariableProximity";
 import logo from "../assets/logo.png";
 import LiquidEther from "../components/LiquidEther";
+import { Link } from "react-router-dom";
 
 const StartingPage = () => {
     const containerRef = useRef(null);
@@ -12,7 +13,7 @@ const StartingPage = () => {
     return (
         <div className="relative w-full h-screen overflow-hidden bg-[#06000F]">
             {/* Light rays background */}
-            {/* <LightRays
+            <LightRays
         raysOrigin="top-center"
         raysColor="#bebadb"
         raysSpeed={1.5}
@@ -23,8 +24,8 @@ const StartingPage = () => {
         noiseAmount={0.1}
         distortion={0.05}
         className="custom-rays"
-      /> */}
-            <div style={{ width: "100%", height: "100%", position: "relative" }}>
+      />
+            {/* <div style={{ width: "100%", height: "100%", position: "relative" }}>
                 <LiquidEther
                     colors={["#5227FF", "#FF9FFC", "#B19EEF"]}
                     mouseForce={20}
@@ -42,7 +43,7 @@ const StartingPage = () => {
                     autoResumeDelay={3000}
                     autoRampDuration={0.6}
                 />
-            </div>
+            </div> */}
 
             {/* Transparent navbar */}
             <CardNav logo={logo} logoAlt="Company Logo" />
@@ -61,21 +62,23 @@ const StartingPage = () => {
                     />
                     {/* Sign in / Sign up buttons */}
                     <div className="mt-8 flex items-center justify-center gap-4">
-                        <button
+                        <Link
+                            to="/signin"
                             type="button"
                             className="bg-white cursor-pointer hover:bg-[#cbcaca] text-black px-6 py-3 rounded-full font-medium shadow-sm hover:opacity-95"
                             aria-label="Sign in"
-                        >
+                            >
                             Sign In
-                        </button>
+                        </Link>
 
-                        <button
+                        <Link
+                            to="/signup"
                             type="button"
                             className="bg-white/10 cursor-pointer text-white px-6 py-3 rounded-full font-medium border border-white/20 backdrop-blur-sm hover:bg-white/20"
                             aria-label="Sign up"
                         >
                             Sign Up
-                        </button>
+                        </Link>
                     </div>
                 </div>
             </div>

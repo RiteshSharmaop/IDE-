@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Link } from "react-router-dom";
 
 export function LoginCard() {
   return (
@@ -22,9 +23,11 @@ export function LoginCard() {
           Enter your email below to login to your account
         </CardDescription>
         <CardAction>
-          <Button variant="link" className="text-[#D0D0D0] cursor-pointer hover:text-white">
+          <Link to="/signup">
+          <Button  variant="link" className="text-[#D0D0D0] cursor-pointer hover:text-white">
             Sign Up
           </Button>
+          </Link>
         </CardAction>
       </CardHeader>
       <CardContent>

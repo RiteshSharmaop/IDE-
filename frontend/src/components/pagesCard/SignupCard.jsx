@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Link } from "react-router-dom";
 
 export function SignupCard() {
   const handleSignup = async()=>{
@@ -89,12 +90,14 @@ export function SignupCard() {
           Sign Up with Google
         </Button>
         <CardAction className="flex justify-center items-center">
+          <Link to="/signin">
           <Button
             variant="link"
             className="text-[#D0D0D0] cursor-pointer hover:text-white"
-          >
+            >
             Already have an account? Login
           </Button>
+          </Link>
         </CardAction>
       </CardFooter>
     </Card>

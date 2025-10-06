@@ -9,9 +9,9 @@ function App() {
   return (
     <>  
       <Routes>
+        <Route path="/" element={<StartingPage />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/signin" element={<Login />} />
-        <Route path="/" element={<StartingPage />} />
         <Route path="/home" element={<CodeIDE />} />
         <Route path="/not-found" element={<NotFound />} />
       </Routes>
