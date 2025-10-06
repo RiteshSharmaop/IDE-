@@ -1,0 +1,45 @@
+version: "3.8"
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: code-ide-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: code-ide
+
+  redis:
+    image: redis:alpine
+    container_name: code-ide-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  app:
+    build: .
+    container_name: code-ide-backend
+    ports:
+      # - "5000:5000"
+      - "8080:8080"
+    depends_on:
+      - mongodb
+      - redis
+    environment:
+      - MONGODB_URI=mongodb+srv://ritesh:ritesh9122@ide.wco15ph.mongodb.net/
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    # volumes:
+    #   - .:/app
+    #   - /app/node_modules
+    # command: npm run dev
+    volumes:
+      - ./src:/usr/src/app/src # <-- host src folder mounted into container
+      - /usr/src/app/node_modules # avoid overwriting node_modules
+    command: npm run dev # run dev with nodemon
+volumes:
+  mongodb_data:
+  redis_data:

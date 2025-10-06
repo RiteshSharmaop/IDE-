@@ -1,0 +1,22 @@
+
+version: '3.8'
+
+services:
+  code-executor:
+    build:
+      context: ./src/services/codeExecutor
+      dockerfile: Dockerfile
+    container_name: code-executor
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /execution
+    mem_limit: 512m
+    cpus: 0.5
+    pids_limit: 50
+    network_mode: none
+    restart: unless-stopped
