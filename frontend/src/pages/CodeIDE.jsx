@@ -1,298 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, User, Plus, FileCode, Settings, Moon, Sun, ChevronDown, Bell, CreditCard, LogOut, Palette, Zap, Terminal, X } from 'lucide-react';
+import { Play, Plus, FileCode, Moon, Sun, Terminal, X, Menu, Save, Users, Share2, Clock } from 'lucide-react';
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { AppSidebar } from '../components/AppSidebar';
+import { MonacoEditor } from '../components/Editor/MonacoEditor';
+import { FileIcon } from '../components/FileIcon';
 
-const MonacoEditor = ({ value, onChange, language, theme }) => {
-  const editorRef = useRef(null);
-  const monacoRef = useRef(null);
-  
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js';
-    script.async = true;
-    document.body.appendChild(script);
-    
-    script.onload = () => {
-      window.require.config({ 
-        paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } 
-      });
-      
-      window.require(['vs/editor/editor.main'], () => {
-        if (editorRef.current && !monacoRef.current) {
-          monacoRef.current = window.monaco.editor.create(editorRef.current, {
-            value: value,
-            language: language,
-            theme: theme === 'dark' ? 'vs-dark' : 'vs',
-            fontSize: 16,
-            minimap: { enabled: false },
-            automaticLayout: true,
-          });
-          
-          monacoRef.current.onDidChangeModelContent(() => {
-            onChange(monacoRef.current.getValue());
-          });
-        }
-      });
-    };
-    
-    return () => {
-      if (monacoRef.current) {
-        monacoRef.current.dispose();
-      }
-    };
-  }, []);
-  
-  useEffect(() => {
-    if (monacoRef.current && monacoRef.current.getValue() !== value) {
-      monacoRef.current.setValue(value || '');
-    }
-  }, [value]);
-  
-  useEffect(() => {
-    if (monacoRef.current) {
-      const model = monacoRef.current.getModel();
-      window.monaco.editor.setModelLanguage(model, language);
-    }
-  }, [language]);
 
-  useEffect(() => {
-    if (monacoRef.current) {
-      monacoRef.current.updateOptions({
-        theme: theme === 'dark' ? 'vs-dark' : 'vs'
-      });
-    }
-  }, [theme]);
-  
-  return <div ref={editorRef} style={{ height: '100%', width: '100%' }} />;
-};
 
-const FileIcon = ({ language, size = 'normal' }) => {
-  const iconMap = {
-    javascript: { color: '#F7DF1E', text: 'JS' },
-    python: { color: '#3776AB', text: 'PY' },
-    cpp: { color: '#00599C', text: 'C++' },
-    c: { color: '#A8B9CC', text: 'C' },
-    java: { color: '#007396', text: 'JAVA' },
-    csharp: { color: '#239120', text: 'C#' },
-    json: { color: '#D0D0D0', text: 'JSON' },
-    markdown: { color: '#D0D0D0', text: 'MD' }
-  };
-  
-  const config = iconMap[language] || { color: '#D0D0D0', text: 'FILE' };
-  const sizeClass = size === 'small' ? 'h-5 w-5 text-[9px]' : 'h-6 w-6 text-[10px]';
-  
-  return (
-    <div 
-      className={`${sizeClass} rounded flex items-center justify-center font-bold`}
-      style={{ backgroundColor: config.color + '20', color: config.color, border: `1px solid ${config.color}` }}
-    >
-      {config.text}
-    </div>
-  );
-};
 
-const AppSidebar = ({ 
-  files, 
-  activeFile, 
-  onFileClick, 
-  isCreatingFile, 
-  setIsCreatingFile,
-  newFileName,
-  setNewFileName,
-  handleCreateFile,
-  user,
-  theme,
-  onThemeChange,
-  connectedUsers
-}) => {
-  return (
-    <Sidebar className="border-r border-[#3E3F3E]">
-      <SidebarHeader className="border-b border-[#3E3F3E] bg-[#171717]">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" className="w-full hover:bg-[#212121]">
-              <div className="flex items-center gap-3 w-full">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-amber-600">
-                  <FileCode className="h-5 w-5 text-white" />
-                </div>
-                <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-semibold text-[#D0D0D0]">Code IDE</span>
-                  <span className="text-xs text-[#3E3F3E]">Professional Edition</span>
-                </div>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarHeader>
-
-      <SidebarContent className="bg-[#171717]">
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-[#3E3F3E] text-xs font-semibold uppercase">Files</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton 
-                  onClick={() => setIsCreatingFile(true)}
-                  className="hover:bg-[#212121] text-[#D0D0D0]"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>New File</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              {isCreatingFile && (
-                <SidebarMenuItem>
-                  <input
-                    type="text"
-                    value={newFileName}
-                    onChange={(e) => setNewFileName(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleCreateFile()}
-                    onBlur={() => newFileName ? handleCreateFile() : setIsCreatingFile(false)}
-                    placeholder="filename.ext"
-                    className="w-full rounded-md border border-[#3E3F3E] bg-[#212121] px-2 py-1.5 text-sm text-[#D0D0D0] placeholder:text-[#3E3F3E] focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    autoFocus
-                  />
-                </SidebarMenuItem>
-              )}
-
-              {files.map(file => (
-                <SidebarMenuItem key={file.id}>
-                  <SidebarMenuButton 
-                    onClick={() => onFileClick(file)}
-                    isActive={activeFile?.id === file.id}
-                    className="hover:bg-[#212121] text-[#D0D0D0] data-[active=true]:bg-[#212121] data-[active=true]:text-amber-500"
-                  >
-                    <FileIcon language={file.language} size="small" />
-                    <span>{file.name}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-
-      <SidebarFooter className="border-t border-[#3E3F3E] bg-[#171717]">
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-[#3E3F3E] text-xs font-semibold uppercase">Connected Users</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <div className="flex items-center gap-2 px-2 py-2">
-              {connectedUsers.map((connectedUser, index) => (
-                <Avatar key={index} className="h-8 w-8 border-2" style={{ borderColor: connectedUser.color }}>
-                  <AvatarImage src={connectedUser.avatar} alt={connectedUser.name} />
-                  <AvatarFallback style={{ backgroundColor: connectedUser.color }} className="text-xs font-semibold text-white">
-                    {connectedUser.name.split(' ').map(n => n[0]).join('')}
-                  </AvatarFallback>
-                </Avatar>
-              ))}
-            </div>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton className="hover:bg-[#212121] data-[state=open]:bg-[#212121] group">
-                  <Avatar className="h-8 w-8 border-2 border-[#3E3F3E]">
-                    <AvatarImage src={user.avatar} alt={user.name} />
-                    <AvatarFallback className="bg-gradient-to-br from-amber-500 to-amber-600 text-white font-semibold text-sm">
-                      {user.name.split(' ').map(n => n[0]).join('')}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col gap-0.5 leading-none flex-1 text-left">
-                    <span className="font-medium text-sm text-[#D0D0D0] group-hover:text-[#FFFFFF] transition-colors">{user.name}</span>
-                    <span className="text-xs text-[#3E3F3E]">{user.email}</span>
-                  </div>
-                  <ChevronDown className="ml-auto h-4 w-4 text-[#3E3F3E]" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent 
-                side="right" 
-                align="end"
-                className="w-72 bg-[#171717] border-[#3E3F3E] text-[#D0D0D0]"
-              >
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex items-center gap-3 py-2">
-                    <Avatar className="h-12 w-12 border-2 border-[#3E3F3E]">
-                      <AvatarImage src={user.avatar} alt={user.name} />
-                      <AvatarFallback className="bg-gradient-to-br from-amber-500 to-amber-600 text-white font-semibold">
-                        {user.name.split(' ').map(n => n[0]).join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col gap-1">
-                      <span className="font-semibold text-[#D0D0D0]">{user.name}</span>
-                      <span className="text-xs text-[#3E3F3E]">{user.email}</span>
-                      <span className="text-xs text-amber-500 font-medium">Free Plan</span>
-                    </div>
-                  </div>
-                </DropdownMenuLabel>
-                
-                <DropdownMenuSeparator className="bg-[#3E3F3E]" />
-                
-                <DropdownMenuItem className="gap-3 py-3 focus:bg-[#212121] focus:text-amber-500 cursor-pointer">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-amber-600">
-                    <Zap className="h-4 w-4 text-white" />
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="font-medium">Upgrade to Pro</span>
-                    <span className="text-xs text-[#3E3F3E]">Unlock all features</span>
-                  </div>
-                </DropdownMenuItem>
-                
-                <DropdownMenuSeparator className="bg-[#3E3F3E]" />
-                
-                <DropdownMenuItem className="gap-3 focus:bg-[#212121] focus:text-[#D0D0D0] cursor-pointer">
-                  <CreditCard className="h-4 w-4" />
-                  <span>Billing</span>
-                </DropdownMenuItem>
-                
-                <DropdownMenuItem className="gap-3 focus:bg-[#212121] focus:text-[#D0D0D0] cursor-pointer">
-                  <Bell className="h-4 w-4" />
-                  <span>Notifications</span>
-                </DropdownMenuItem>
-                
-                <DropdownMenuItem className="gap-3 focus:bg-[#212121] focus:text-[#D0D0D0] cursor-pointer">
-                  <Settings className="h-4 w-4" />
-                  <span>Settings</span>
-                </DropdownMenuItem>
-                
-                <DropdownMenuSeparator className="bg-[#3E3F3E]" />
-                
-                <DropdownMenuItem className="gap-3 focus:bg-red-950 focus:text-red-400 cursor-pointer text-red-400">
-                  <LogOut className="h-4 w-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
-    </Sidebar>
-  );
-};
 
 const CodeIDE = () => {
   const [theme, setTheme] = useState('dark');
@@ -311,6 +29,8 @@ const CodeIDE = () => {
   const [errorContent, setErrorContent] = useState('');
   const [terminalInputValue, setTerminalInputValue] = useState('');
   const [terminalOpen, setTerminalOpen] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [autoSave, setAutoSave] = useState(false);
   
   const [user, setUser] = useState({
     name: 'John Doe',
@@ -377,8 +97,13 @@ const CodeIDE = () => {
     e.stopPropagation();
     const newOpenFiles = openFiles.filter(f => f.id !== fileId);
     setOpenFiles(newOpenFiles);
-    if (activeFile.id === fileId && newOpenFiles.length > 0) {
-      setActiveFile(newOpenFiles[newOpenFiles.length - 1]);
+    
+    if (activeFile?.id === fileId) {
+      if (newOpenFiles.length > 0) {
+        setActiveFile(newOpenFiles[newOpenFiles.length - 1]);
+      } else {
+        setActiveFile(null);
+      }
     }
   };
 
@@ -390,6 +115,7 @@ const CodeIDE = () => {
   };
 
   const handleRunCode = () => {
+    if (!activeFile) return;
     setOutputContent(`Running ${activeFile.name}...\n${activeFile.content}\n\n[Execution completed]`);
     setErrorContent('');
     setTerminalTab('output');
@@ -439,9 +165,90 @@ const CodeIDE = () => {
             </div>
             
             <div className="flex items-center gap-3">
+              <div className="relative">
+                <button
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                  style={{ 
+                    backgroundColor: menuOpen ? '#F59E0B' : secondaryBg, 
+                    color: menuOpen ? '#FFFFFF' : textColor,
+                  }}
+                >
+                  <Menu className="h-4 w-4" />
+                  Menu
+                </button>
+                
+                {menuOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-10" 
+                      onClick={() => setMenuOpen(false)}
+                    />
+                    <div 
+                      className="absolute right-0 mt-2 w-64 rounded-lg border shadow-lg z-20 overflow-hidden"
+                      style={{ backgroundColor: bgColor, borderColor }}
+                    >
+                      <button
+                        onClick={() => {
+                          setMenuOpen(false);
+                          alert('File saved!');
+                        }}
+                        className="flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors hover:bg-amber-500 hover:text-white"
+                        style={{ color: textColor }}
+                      >
+                        <Save className="h-4 w-4" />
+                        <span className="font-medium">Save File</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors hover:bg-amber-500 hover:text-white"
+                        style={{ color: textColor }}
+                      >
+                        <Users className="h-4 w-4" />
+                        <span className="font-medium">Collaborate</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors hover:bg-amber-500 hover:text-white"
+                        style={{ color: textColor }}
+                      >
+                        <Share2 className="h-4 w-4" />
+                        <span className="font-medium">Publish</span>
+                      </button>
+                      
+                      <div className="border-t" style={{ borderColor }} />
+                      
+                      <div
+                        className="flex items-center justify-between w-full px-4 py-3"
+                        style={{ color: textColor }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Clock className="h-4 w-4" />
+                          <span className="font-medium text-sm">Auto Save</span>
+                        </div>
+                        <button
+                          onClick={() => setAutoSave(!autoSave)}
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          style={{ backgroundColor: autoSave ? '#F59E0B' : mutedText }}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              autoSave ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
               <button
                 onClick={() => setTerminalOpen(!terminalOpen)}
-                className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                disabled={!activeFile}
+                className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ 
                   backgroundColor: secondaryBg, 
                   color: textColor,
@@ -465,7 +272,8 @@ const CodeIDE = () => {
               
               <button
                 onClick={handleRunCode}
-                className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-amber-600 hover:shadow-lg hover:shadow-amber-500/50"
+                disabled={!activeFile}
+                className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-amber-600 hover:shadow-lg hover:shadow-amber-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Play className="h-4 w-4" />
                 Run Code
@@ -482,9 +290,9 @@ const CodeIDE = () => {
                   className="flex items-center gap-2 border-r px-4 py-2.5 cursor-pointer transition-colors group"
                   style={{
                     borderColor,
-                    backgroundColor: activeFile.id === file.id ? secondaryBg : bgColor,
-                    color: activeFile.id === file.id ? '#F59E0B' : textColor,
-                    borderBottom: activeFile.id === file.id ? '2px solid #F59E0B' : 'none'
+                    backgroundColor: activeFile?.id === file.id ? secondaryBg : bgColor,
+                    color: activeFile?.id === file.id ? '#F59E0B' : textColor,
+                    borderBottom: activeFile?.id === file.id ? '2px solid #F59E0B' : 'none'
                   }}
                 >
                   <FileIcon language={file.language} size="small" />
@@ -504,6 +312,7 @@ const CodeIDE = () => {
           <div className="flex-1 overflow-hidden" style={{ backgroundColor: bgColor }}>
             {activeFile ? (
               <MonacoEditor
+                key={activeFile.id}
                 value={activeFile.content}
                 onChange={handleEditorChange}
                 language={activeFile.language}
@@ -512,15 +321,22 @@ const CodeIDE = () => {
             ) : (
               <div className="flex h-full items-center justify-center" style={{ color: mutedText }}>
                 <div className="text-center">
-                  <FileCode size={48} className="mx-auto mb-4 opacity-50" />
-                  <p style={{ color: textColor }}>No file open</p>
-                  <p className="text-sm mt-2">Create or select a file to start coding</p>
+                  <FileCode size={64} className="mx-auto mb-6 opacity-30" style={{ color: textColor }} />
+                  <p className="text-xl font-semibold mb-3" style={{ color: textColor }}>No File Open</p>
+                  <p className="text-sm mb-6" style={{ color: mutedText }}>Create a new file or open an existing one to start coding</p>
+                  <button
+                    onClick={() => setIsCreatingFile(true)}
+                    className="flex items-center gap-2 mx-auto rounded-lg bg-amber-500 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-600 hover:shadow-lg hover:shadow-amber-500/50"
+                  >
+                    <Plus className="h-5 w-5" />
+                    Create New File
+                  </button>
                 </div>
               </div>
             )}
           </div>
 
-          {terminalOpen && (
+          {terminalOpen && activeFile && (
             <div className="h-64 border-t flex flex-col" style={{ borderColor, backgroundColor: bgColor }}>
               <div className="flex items-center justify-between border-b" style={{ borderColor, backgroundColor: bgColor }}>
                 <div className="flex items-center">

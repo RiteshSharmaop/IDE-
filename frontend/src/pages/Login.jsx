@@ -1,7 +1,7 @@
 import AnimatedBackground from "../animation/AnimatedBackground";
 import { LoginCard } from "../components/pagesCard/LoginCard";
 
-export const Login = ()=> {
+const Login = ()=> {
   return (
     <div className="bg-[#0A0A0A] min-h-screen flex">
       {/* Left side - animated text */}
@@ -16,3 +16,5 @@ export const Login = ()=> {
     </div>
   );
 }
+
+export default Login;
