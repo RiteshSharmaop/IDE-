@@ -86,7 +86,7 @@ const AppSidebar = ({
                   <SidebarMenuButton 
                     onClick={() => onFileClick(file)}
                     isActive={activeFile?.id === file.id}
-                    className="hover:bg-[#212121] text-[#D0D0D0] data-[active=true]:bg-[#212121] data-[active=true]:text-amber-500"
+                    className="hover:bg-[#212121] hover:text-white h-10 cursor-pointer text-[#D0D0D0] data-[active=true]:bg-[#212121] data-[active=true]:text-amber-500"
                   >
                     <FileIcon language={file.language} size="small" />
                     <span>{file.name}</span>

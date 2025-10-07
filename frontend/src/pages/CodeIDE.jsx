@@ -8,6 +8,7 @@ import { AppSidebar } from '../components/AppSidebar';
 import { MonacoEditor } from '../components/Editor/MonacoEditor';
 import { FileIcon } from '../components/FileIcon';
 import { useAuth } from '../lib/auth';
+import logo from "../assets/logo.png";
 
 
 
@@ -162,15 +163,57 @@ const CodeIDE = () => {
         <main className="flex flex-1 flex-col overflow-hidden">
           <header className="flex h-14 items-center justify-between border-b px-4" style={{ borderColor, backgroundColor: bgColor }}>
             <div className="flex items-center gap-3">
-              <SidebarTrigger style={{ color: textColor }} className="hover:bg-opacity-10" />
-              <h1 className="text-lg font-semibold" style={{ color: textColor }}>Code Editor</h1>
+              <SidebarTrigger style={{ color: textColor }} className="cursor-e-resize hover:bg-opacity-10 " />
+              <img 
+                src={logo} 
+                alt="Logo" 
+                className="w-12 h-12 object-contain transform scale-170"
+              />
+              <h1 className="text-2xl font-semibold" style={{ color: textColor }}>Code Editor</h1>
             </div>
             
             <div className="flex items-center gap-3">
+              
+
+              <button
+                onClick={() => setTerminalOpen(!terminalOpen)}
+                disabled={!activeFile}
+                className=" cursor-pointer flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ 
+                  backgroundColor: secondaryBg, 
+                  color: textColor,
+                }}
+              >
+                <Terminal className="h-4 w-4" />
+                {terminalOpen ? 'Hide' : 'Show'} Terminal
+              </button>
+
+              <button
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className=" cursor-pointer flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                style={{ 
+                  backgroundColor: secondaryBg, 
+                  color: textColor,
+                }}
+              >
+                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                {theme === 'dark' ? 'Light' : 'Dark'}
+              </button>
+              
+              <button
+                onClick={handleRunCode}
+                disabled={!activeFile}
+                className=" cursor-pointer flex items-center gap-2 rounded-lg   bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-amber-600  disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Play className="h-4 w-4" />
+                Run Code
+              </button>
+
+
               <div className="relative">
                 <button
                   onClick={() => setMenuOpen(!menuOpen)}
-                  className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                  className="flex  cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
                   style={{ 
                     backgroundColor: menuOpen ? '#F59E0B' : secondaryBg, 
                     color: menuOpen ? '#FFFFFF' : textColor,
@@ -195,7 +238,7 @@ const CodeIDE = () => {
                           setMenuOpen(false);
                           alert('File saved!');
                         }}
-                        className="flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors hover:bg-amber-500 hover:text-white"
+                        className="flex cursor-pointer items-center gap-3 w-full px-4 py-3 text-sm transition-colors hover:bg-amber-500 hover:text-white"
                         style={{ color: textColor }}
                       >
                         <Save className="h-4 w-4" />
@@ -204,7 +247,7 @@ const CodeIDE = () => {
                       
                       <button
                         onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors hover:bg-amber-500 hover:text-white"
+                        className="flex cursor-pointer items-center gap-3 w-full px-4 py-3 text-sm transition-colors hover:bg-amber-500 hover:text-white"
                         style={{ color: textColor }}
                       >
                         <Users className="h-4 w-4" />
@@ -213,7 +256,7 @@ const CodeIDE = () => {
                       
                       <button
                         onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors hover:bg-amber-500 hover:text-white"
+                        className="flex  cursor-pointer items-center gap-3 w-full px-4 py-3 text-sm transition-colors hover:bg-amber-500 hover:text-white"
                         style={{ color: textColor }}
                       >
                         <Share2 className="h-4 w-4" />
@@ -223,7 +266,7 @@ const CodeIDE = () => {
                       <div className="border-t" style={{ borderColor }} />
                       
                       <div
-                        className="flex items-center justify-between w-full px-4 py-3"
+                        className="flex r items-center justify-between w-full px-4 py-3 cursor-default"
                         style={{ color: textColor }}
                       >
                         <div className="flex items-center gap-3">
@@ -232,11 +275,11 @@ const CodeIDE = () => {
                         </div>
                         <button
                           onClick={() => setAutoSave(!autoSave)}
-                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          className="relative cursor-pointer inline-flex h-6 w-11 items-center rounded-full transition-colors"
                           style={{ backgroundColor: autoSave ? '#F59E0B' : mutedText }}
                         >
                           <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            className={` inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                               autoSave ? 'translate-x-6' : 'translate-x-1'
                             }`}
                           />
@@ -246,40 +289,6 @@ const CodeIDE = () => {
                   </>
                 )}
               </div>
-
-              <button
-                onClick={() => setTerminalOpen(!terminalOpen)}
-                disabled={!activeFile}
-                className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ 
-                  backgroundColor: secondaryBg, 
-                  color: textColor,
-                }}
-              >
-                <Terminal className="h-4 w-4" />
-                {terminalOpen ? 'Hide' : 'Show'} Terminal
-              </button>
-
-              <button
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-                style={{ 
-                  backgroundColor: secondaryBg, 
-                  color: textColor,
-                }}
-              >
-                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                {theme === 'dark' ? 'Light' : 'Dark'}
-              </button>
-              
-              <button
-                onClick={handleRunCode}
-                disabled={!activeFile}
-                className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-amber-600 hover:shadow-lg hover:shadow-amber-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Play className="h-4 w-4" />
-                Run Code
-              </button>
             </div>
           </header>
 
@@ -346,7 +355,7 @@ const CodeIDE = () => {
                     <button
                       key={tab}
                       onClick={() => setTerminalTab(tab)}
-                      className="px-4 py-2.5 text-sm font-medium capitalize transition-colors"
+                      className="px-4 py-2.5 cursor-pointer text-sm font-medium capitalize transition-colors"
                       style={{
                         borderBottom: terminalTab === tab ? '2px solid #F59E0B' : 'none',
                         color: terminalTab === tab ? '#F59E0B' : mutedText,

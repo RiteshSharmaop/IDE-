@@ -87,12 +87,13 @@ export function LoginCard() {
                 <Label htmlFor="password" className="text-[#D0D0D0]">
                   Password
                 </Label>
-                <a
+                <Link
+                  to="/not-found"
                   href="#"
                   className="ml-auto cursor-pointer text-sm underline-offset-4 hover:underline text-[#D0D0D0] hover:text-white"
                 >
                   Forgot your password?
-                </a>
+                </Link>
               </div>
               <Input
                 id="password"
@@ -120,6 +121,9 @@ export function LoginCard() {
         <Button
           variant="outline"
           className="w-full cursor-pointer border border-[#3E3F3E] bg-[#3e3f3eaf] hover:bg-[#6260608e] text-white hover:text-white"
+          onClick={()=>{
+            navigate("/not-found")
+          }}
         >
           Login with Google
         </Button>

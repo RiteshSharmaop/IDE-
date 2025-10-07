@@ -126,6 +126,9 @@ export function SignupCard() {
         <Button
           variant="outline"
           className="w-full cursor-pointer border border-[#3E3F3E] bg-[#3e3f3eaf] hover:bg-[#6260608e] text-white hover:text-white"
+          onClick={()=>{
+            navigate("/not-found")
+          }}
         >
           Sign Up with Google
         </Button>
