@@ -7,6 +7,7 @@ import {
 import { AppSidebar } from '../components/AppSidebar';
 import { MonacoEditor } from '../components/Editor/MonacoEditor';
 import { FileIcon } from '../components/FileIcon';
+import { useAuth } from '../lib/auth';
 
 
 
@@ -32,12 +33,13 @@ const CodeIDE = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [autoSave, setAutoSave] = useState(false);
   
-  const [user, setUser] = useState({
-    name: 'John Doe',
-    email: 'john@example.com',
-    avatar: '',
-    filesCreated: files.length
-  });
+  
+
+  const {user , setUser } = useAuth();
+
+  console.log("user in code Ide from context : " ,user);
+  
+  
 
   const [connectedUsers] = useState([
     { name: 'Alice Smith', avatar: '', color: '#10A37F' },

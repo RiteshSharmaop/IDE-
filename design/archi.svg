@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="560" viewBox="0 0 1000 560">
+  <style>
+    .box { fill:#0b1020; stroke:#3b82f6; stroke-width:1.6; rx:8; ry:8; }
+    .box-ghost { fill:#071328; stroke:#60a5fa; stroke-width:1.2; rx:6; ry:6; opacity:0.9; }
+    .title { fill:#e6eefc; font: 600 14px/1.1 sans-serif; }
+    .label { fill:#cfe6ff; font: 12px/1 sans-serif; }
+    .small { fill:#9fbff5; font: 11px/1 sans-serif; }
+    .arrow { stroke:#9fbff5; stroke-width:2; fill:none; marker-end:url(#arrowhead); }
+  </style>
+
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#9fbff5"/>
+    </marker>
+  </defs>
+
+  <!-- Frontend -->
+  <rect x="30" y="30" width="280" height="160" class="box"/>
+  <text x="50" y="56" class="title">Frontend — React App</text>
+  <text x="50" y="80" class="label">Monaco Editor + y-monaco</text>
+  <text x="50" y="100" class="label">Yjs CRDT (client)</text>
+  <text x="50" y="118" class="small">Socket.IO client adapter</text>
+  <text x="50" y="136" class="small">Auth: `src/lib/api.js`, `auth.js`</text>
+
+  <!-- Socket cluster -->
+  <rect x="360" y="20" width="270" height="210" class="box-ghost"/>
+  <text x="372" y="44" class="title">Socket.IO Cluster (Node)</text>
+  <text x="372" y="68" class="label">Socket.IO server</text>
+  <text x="372" y="88" class="label">Yjs server (optional in-memory)</text>
+  <text x="372" y="108" class="small">Redis adapter (socket.io-redis)</text>
+  <text x="372" y="126" class="small">Auth handshake (JWT)</text>
+  <text x="372" y="144" class="small">Kafka Producer: publish updates</text>
+
+  <!-- Redis -->
+  <rect x="660" y="30" width="120" height="64" rx="8" ry="8" fill="#071328" stroke="#60a5fa"/>
+  <text x="675" y="52" class="title">Redis</text>
+  <text x="675" y="68" class="small">Presence / rooms / adapter</text>
+
+  <!-- Kafka -->
+  <rect x="360" y="260" width="170" height="120" class="box"/>
+  <text x="380" y="286" class="title">Kafka Cluster</text>
+  <text x="380" y="306" class="label">Topics:</text>
+  <text x="400" y="326" class="small">doc-updates (by docId)</text>
+  <text x="400" y="346" class="small">doc-snapshots</text>
+  <text x="400" y="366" class="small">audit-log</text>
+
+  <!-- Consumers / Workers -->
+  <rect x="560" y="260" width="220" height="120" class="box-ghost"/>
+  <text x="576" y="286" class="title">Workers / Consumers</text>
+  <text x="576" y="306" class="small">- Persist snapshots → MongoDB</text>
+  <text x="576" y="324" class="small">- Analytics / audit</text>
+  <text x="576" y="342" class="small">- Replay / recovery</text>
+
+  <!-- DB & S3 -->
+  <rect x="30" y="220" width="260" height="140" class="box"/>
+  <text x="50" y="246" class="title">Persistence</text>
+  <text x="50" y="268" class="label">MongoDB (files, users, metadata)</text>
+  <text x="50" y="288" class="label">S3 (optional snapshots/backups)</text>
+
+  <!-- Load Balancer / K8s -->
+  <rect x="30" y="380" width="750" height="120" rx="8" ry="8" fill="#041022" stroke="#60a5fa" opacity="0.35"/>
+  <text x="42" y="404" class="title">Deployment: LB → Socket.IO replicas (k8s / autoscale)</text>
+  <text x="42" y="426" class="small">Sticky sessions optional; prefer socket.io-redis adapter</text>
+
+  <!-- arrows: Frontend -> Socket -->
+  <path d="M310 110 L360 110" class="arrow"/>
+  <text x="318" y="100" class="small">Socket.IO (Yjs updates)</text>
+
+  <!-- Socket -> Redis -->
+  <path d="M630 90 L660 62" class="arrow"/>
+  <text x="620" y="78" class="small">presence pub/sub</text>
+
+  <!-- Socket -> Kafka -->
+  <path d="M520 140 L520 260" class="arrow"/>
+  <text x="466" y="200" class="small">produce doc-updates</text>
+
+  <!-- Kafka -> Workers -->
+  <path d="M530 380 L600 380" class="arrow"/>
+  <text x="530" y="372" class="small">consume / persist</text>
+
+  <!-- Workers -> MongoDB / S3 -->
+  <path d="M640 300 L600 300 L600 280 L300 280" class="arrow"/>
+  <text x="470" y="295" class="small">store snapshots → MongoDB/S3</text>
+
+  <!-- Frontend -> REST -->
+  <path d="M140 200 L360 220" class="arrow"/>
+  <text x="180" y="210" class="small">REST API (auth, open file)</text>
+
+  <!-- Legend -->
+  <rect x="820" y="360" width="160" height="170" rx="6" ry="6" fill="#071328" stroke="#60a5fa"/>
+  <text x="832" y="380" class="title">Legend</text>
+  <text x="832" y="398" class="small">Socket.IO: realtime transport</text>
+  <text x="832" y="414" class="small">Yjs: CRDT (client state)</text>
+  <text x="832" y="430" class="small">Kafka: durable events</text>
+  <text x="832" y="446" class="small">Redis: presence & adapter</text>
+  <text x="832" y="462" class="small">Workers: consume & persist</text>
+</svg>

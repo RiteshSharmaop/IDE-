@@ -10,9 +10,41 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import api from "../../lib/api";
+import { useAuth } from "../../lib/auth";
 
 export function LoginCard() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
+
+  const { signin } = useAuth();
+
+  const handleLogin = async (e) => {
+    e?.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.post("/api/auth/signin", { email, password });
+      if (res?.data?.success) {
+        const token = res.data.data?.token;
+        const user = res.data.data?.user;
+        if (token) signin(token, user);
+        navigate("/home");
+      } else {
+        setError(res?.data?.message || "Login failed");
+      }
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || "Server error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Card className="relative w-full max-w-sm bg-[#171717] text-[#D0D0D0] border border-[#3E3F3E] shadow-lg z-10">
       <CardHeader>
@@ -24,9 +56,12 @@ export function LoginCard() {
         </CardDescription>
         <CardAction>
           <Link to="/signup">
-          <Button  variant="link" className="text-[#D0D0D0] cursor-pointer hover:text-white">
-            Sign Up
-          </Button>
+            <Button
+              variant="link"
+              className="text-[#D0D0D0] cursor-pointer hover:text-white"
+            >
+              Sign Up
+            </Button>
           </Link>
         </CardAction>
       </CardHeader>
@@ -40,6 +75,8 @@ export function LoginCard() {
               <Input
                 id="email"
                 type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="m@example.com"
                 required
                 className="bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0] placeholder-[#3E3F3E] focus:ring-[#D0D0D0]"
@@ -60,6 +97,8 @@ export function LoginCard() {
               <Input
                 id="password"
                 type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="********"
                 required
                 className="bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0] placeholder-[#3E3F3E] focus:ring-[#D0D0D0]"
@@ -71,10 +110,13 @@ export function LoginCard() {
       <CardFooter className="flex-col gap-2">
         <Button
           type="submit"
+          onClick={handleLogin}
+          disabled={loading}
           className="w-full cursor-pointer hover:bg-[#3E3F3E] bg-white text-black hover:text-[#D0D0D0]"
         >
-          Login
+          {loading ? "Logging in..." : "Login"}
         </Button>
+        {error && <div className="text-sm text-red-400 mt-2">{error}</div>}
         <Button
           variant="outline"
           className="w-full cursor-pointer border border-[#3E3F3E] bg-[#3e3f3eaf] hover:bg-[#6260608e] text-white hover:text-white"

@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { FileIcon } from './FileIcon';
+import { useAuth } from '../lib/auth';
 
 
 
@@ -43,25 +44,11 @@ const AppSidebar = ({
   onThemeChange,
   connectedUsers
 }) => {
+
+  const {signout} = useAuth();
   return (
     <Sidebar className="border-r border-[#3E3F3E]">
-      <SidebarHeader className="border-b border-[#3E3F3E] bg-[#171717]">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" className="w-full hover:bg-[#212121]">
-              <div className="flex items-center gap-3 w-full">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-amber-600">
-                  <FileCode className="h-5 w-5 text-white" />
-                </div>
-                <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-semibold text-[#D0D0D0]">Code IDE</span>
-                </div>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarHeader>
-
+      
       <SidebarContent className="bg-[#171717]">
         <SidebarGroup>
           <SidebarGroupLabel className="text-[#3E3F3E] text-xs font-semibold uppercase">Files</SidebarGroupLabel>
@@ -70,7 +57,7 @@ const AppSidebar = ({
               <SidebarMenuItem>
                 <SidebarMenuButton 
                   onClick={() => setIsCreatingFile(true)}
-                  className="hover:bg-[#212121] text-[#D0D0D0]"
+                  className="hover:bg-[#898888] text-[#D0D0D0] cursor-pointer"
                 >
                   <Plus className="h-4 w-4" />
                   <span>New File</span>
@@ -78,12 +65,8 @@ const AppSidebar = ({
               </SidebarMenuItem>
 
               {isCreatingFile && (
-                <SidebarMenuItem>
-                  <div className="px-2 py-2 bg-[#212121] rounded-lg border-2 border-amber-500 shadow-lg shadow-amber-500/20">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Plus className="h-4 w-4 text-amber-500" />
-                      <span className="text-xs font-semibold text-amber-500">Create New File</span>
-                    </div>
+                <SidebarMenuItem className="mt-2">
+                  
                     <input
                       type="text"
                       value={newFileName}
@@ -91,10 +74,10 @@ const AppSidebar = ({
                       onKeyPress={(e) => e.key === 'Enter' && handleCreateFile()}
                       onBlur={() => newFileName ? handleCreateFile() : setIsCreatingFile(false)}
                       placeholder="filename.ext"
-                      className="w-full rounded-md border border-amber-500 bg-[#171717] px-3 py-2 text-sm text-[#D0D0D0] placeholder:text-[#3E3F3E] focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="w-full rounded-md border  bg-[#171717] px-3 py-2 text-sm text-[#D0D0D0] placeholder:text-[#3E3F3E] focus:outline-none"
                       autoFocus
                     />
-                  </div>
+                  
                 </SidebarMenuItem>
               )}
 
@@ -124,11 +107,11 @@ const AppSidebar = ({
                   <Avatar className="h-8 w-8 border-2 border-[#3E3F3E]">
                     <AvatarImage src={user.avatar} alt={user.name} />
                     <AvatarFallback className="bg-gradient-to-br from-amber-500 to-amber-600 text-white font-semibold text-sm">
-                      {user.name.split(' ').map(n => n[0]).join('')}
+                      {user.username[0]}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col gap-0.5 leading-none flex-1 text-left">
-                    <span className="font-medium text-sm text-[#D0D0D0] group-hover:text-[#FFFFFF] transition-colors">{user.name}</span>
+                    <span className="font-medium text-sm text-[#D0D0D0] group-hover:text-[#FFFFFF] transition-colors">{user.username}</span>
                     <span className="text-xs text-[#3E3F3E]">{user.email}</span>
                   </div>
                   <ChevronDown className="ml-auto h-4 w-4 text-[#3E3F3E]" />
@@ -144,11 +127,11 @@ const AppSidebar = ({
                     <Avatar className="h-12 w-12 border-2 border-[#3E3F3E]">
                       <AvatarImage src={user.avatar} alt={user.name} />
                       <AvatarFallback className="bg-gradient-to-br from-amber-500 to-amber-600 text-white font-semibold">
-                        {user.name.split(' ').map(n => n[0]).join('')}
+                        {user.username}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col gap-1">
-                      <span className="font-semibold text-[#D0D0D0]">{user.name}</span>
+                      <span className="font-semibold text-[#D0D0D0]">{user.username}</span>
                       <span className="text-xs text-[#3E3F3E]">{user.email}</span>
                       <span className="text-xs text-amber-500 font-medium">Free Plan</span>
                     </div>
@@ -162,7 +145,7 @@ const AppSidebar = ({
                     <Zap className="h-4 w-4 text-white" />
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <span className="font-medium">Upgrade to Pro</span>
+                    <span className="font-medium">Buy me a coffee.</span>
                     <span className="text-xs text-[#3E3F3E]">Unlock all features</span>
                   </div>
                 </DropdownMenuItem>
@@ -186,7 +169,7 @@ const AppSidebar = ({
                 
                 <DropdownMenuSeparator className="bg-[#3E3F3E]" />
                 
-                <DropdownMenuItem className="gap-3 focus:bg-red-950 focus:text-red-400 cursor-pointer text-red-400">
+                <DropdownMenuItem onClick={signout} className="gap-3 focus:bg-red-950 focus:text-red-400 cursor-pointer text-red-400">
                   <LogOut className="h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>
