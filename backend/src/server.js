@@ -48,7 +48,7 @@ app.use("/api/execute", executeRoutes);
 // Health check
 app.get("/api/health", (req, res) => {
   res.status(200).json({
-    status: "ide server is healthy",
+    status: "ide server is healthy and running",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });

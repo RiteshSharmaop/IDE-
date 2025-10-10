@@ -1,5 +1,5 @@
 const dockerExecutor = require("../services/codeExecutor/dockerExecutor");
-const { redisUtils } = require("../config/redis");
+// const { redisUtils } = require("../config/redis`");
 
 exports.executeCode = async (req, res) => {
   try {
@@ -11,7 +11,8 @@ exports.executeCode = async (req, res) => {
         message: "Code and language are required",
       });
     }
-
+    
+    
     // Supported languages
     const supportedLanguages = [
       "javascript",
@@ -29,18 +30,19 @@ exports.executeCode = async (req, res) => {
         )}`,
       });
     }
-
-    // Rate limiting
-    const rateLimitKey = `ratelimit:execute:${req.user.id}`;
-    const execCount = (await redisUtils.get(rateLimitKey)) || 0;
-
-    if (execCount >= 50) {
-      return res.status(429).json({
-        success: false,
-        message: "Rate limit exceeded. Maximum 50 executions per hour.",
-      });
-    }
-
+    
+    // // Rate limiting
+    // const rateLimitKey = `ratelimit:execute:${req.user.id}`;
+    // const execCount = (await redisUtils.get(rateLimitKey)) || 0;
+    console.log("Executing code:", { language, code, input });
+    
+    // if (execCount >= 50) {
+    //   return res.status(429).json({
+    //     success: false,
+    //     message: "Rate limit exceeded. Maximum 50 executions per hour.",
+    //   });
+    // }
+    
     // Ensure Docker container is running
     await dockerExecutor.startContainer();
 
@@ -50,9 +52,10 @@ exports.executeCode = async (req, res) => {
     const executionTime = Date.now() - startTime;
 
     // Update rate limit
-    await redisUtils.incr(rateLimitKey);
+    // await redisUtils.incr(rateLimitKey);
+
     // tll 1hre
-    await redisUtils.expire(rateLimitKey, 3600);
+    // await redisUtils.expire(rateLimitKey, 3600);
 
     res.json({
       success: true,

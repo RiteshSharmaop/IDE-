@@ -7,6 +7,8 @@ const { protect } = require('../middleware/auth');
 // @route   POST /api/code/execute
 // @desc    Execute user-submitted code inside Docker
 // @access  Private (requires JWT auth)
-router.post('/execute', protect, executeCode);
+// router.post('/run', protect, executeCode);
+router.post('/run', executeCode);
+
 
 module.exports = router;

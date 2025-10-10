@@ -20,3 +20,6 @@ services:
     pids_limit: 50
     network_mode: none
     restart: unless-stopped
+
+
+    
