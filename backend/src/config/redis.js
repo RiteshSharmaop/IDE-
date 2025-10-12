@@ -25,7 +25,7 @@ const connectRedis = async () => {
       console.log('🔗 Connecting to Redis...');
     });
 
-    redisClient.on('ready', () => {
+    redisClient.on('ready', async() => {
       console.log('✅ Redis connected successfully');
     });
 

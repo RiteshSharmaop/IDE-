@@ -4,12 +4,19 @@ import "./index.css";
 import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./lib/auth";
+import { SocketProvider } from "./context/SocketContext.jsx";
+import { RoomProvider } from "./context/RoomContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <SocketProvider>
+          <RoomProvider>
+
+            <App />
+          </RoomProvider>
+        </SocketProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>

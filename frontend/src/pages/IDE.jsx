@@ -3,6 +3,7 @@ import { Play, Plus, FileCode, Moon, Sun, Terminal, X, Menu, Save, Users, Share2
 import { MonacoEditor } from '../components/Editor/MonacoEditor';
 import { colors } from '../lib/utils';
 import { runTheCode } from '../lib/codeExecute.js';
+import logo from "../assets/logo.png";
 const IDE = () => {
   const [theme, setTheme] = useState('dark');
   const [files, setFiles] = useState([
@@ -145,7 +146,8 @@ const IDE = () => {
           {!sidebarCollapsed && (
             <div className="flex items-center gap-2">
               <Code2 size={24} style={{ color: c.accent }} />
-              <span className="font-bold text-lg">IDE</span>
+             
+              <span className="font-bold text-lg">HexaHub</span>
             </div>
           )}
           <button

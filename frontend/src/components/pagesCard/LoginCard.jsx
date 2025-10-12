@@ -14,6 +14,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { useSocket } from "../../context/SocketContext";
+import { useRoom } from "../../context/RoomContext";
 
 export function LoginCard() {
   const [email, setEmail] = useState("");
@@ -21,20 +23,46 @@ export function LoginCard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
-
   const { signin } = useAuth();
+  // const {socketId , setSocketId} = useSocket();
+  const { roomId, setRoomId } = useRoom();
 
   const handleLogin = async (e) => {
     e?.preventDefault();
     setLoading(true);
     setError(null);
+    const createdRoomId = crypto.randomUUID();
+    
+    try {
+      const res = await api.post("/api/auth/signin", { email, password });
+      if (res?.data?.success) {
+        const token = res.data.data?.token;
+        console.log("roomID ", createdRoomId);
+        const user = res.data.data?.user;
+        if (token) signin(token, user);
+        navigate(`/e/${createdRoomId}`);
+      } else {
+        setError(res?.data?.message || "Login failed");
+      }
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || "Server error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoginAndJoinRoom = async (e) => {
+    e?.preventDefault();
+    setLoading(true);
+    setError(null);
+
     try {
       const res = await api.post("/api/auth/signin", { email, password });
       if (res?.data?.success) {
         const token = res.data.data?.token;
         const user = res.data.data?.user;
         if (token) signin(token, user);
-        navigate("/home");
+        navigate(`/e/${roomId}`);
       } else {
         setError(res?.data?.message || "Login failed");
       }
@@ -118,14 +146,19 @@ export function LoginCard() {
           {loading ? "Logging in..." : "Login"}
         </Button>
         {error && <div className="text-sm text-red-400 mt-2">{error}</div>}
+        <Input
+          id="roomId"
+          placeholder="room id"
+          value={roomId}
+          onChange={(e) => setRoomId(e.target.value)}
+          className="bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0] placeholder-[#3E3F3E] focus:ring-[#D0D0D0]"
+        />
         <Button
           variant="outline"
           className="w-full cursor-pointer border border-[#3E3F3E] bg-[#3e3f3eaf] hover:bg-[#6260608e] text-white hover:text-white"
-          onClick={()=>{
-            navigate("/not-found")
-          }}
+          onClick={handleLoginAndJoinRoom}
         >
-          Login with Google
+          Login and Join Room
         </Button>
       </CardFooter>
     </Card>

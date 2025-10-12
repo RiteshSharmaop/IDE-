@@ -7,18 +7,19 @@ const rateLimit = require("express-rate-limit");
 require("dotenv").config();
 
 const connectDB = require("./config/database");
-// const { connectRedis } = require("./config/redis");
+const { connectRedis } = require("./config/redis");
 
 // Import routes
 const authRoutes = require("./routes/auth");
 const fileRoutes = require("./routes/files");
 const executeRoutes = require("./routes/execute");
+const { roomRouter } = require("./routes/room");
 
 const app = express();
 
 // Connect to databases
 connectDB();
-// connectRedis();
+connectRedis();
 
 // Middleware
 app.use(helmet());
@@ -47,6 +48,7 @@ app.use("/api/", limiter);
 app.use("/api/auth", authRoutes);
 app.use("/api/files", fileRoutes);
 app.use("/api/execute", executeRoutes);
+app.use("/api/room", roomRouter);
 
 // Health check
 app.get("/api/health", (req, res) => {

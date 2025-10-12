@@ -1,25 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Play, Plus, FileCode, Moon, Sun, Terminal, X, Menu, Save, Users, Share2, Clock, Folder, Search, Settings, Code2, Layers, ChevronRight, ChevronDown, User, LogOut, Bell, CreditCard, Zap } from 'lucide-react';
 
-import { MonacoEditor } from '../components/Editor/MonacoEditor';
-import { runTheCode } from '../lib/codeExecute';
-import { useAuth } from '../lib/auth';
-
 const CodeIDE = () => {
- const [theme, setTheme] = useState('dark');
+  const [theme, setTheme] = useState('dark');
   const [files, setFiles] = useState([
-    { 
-      id: 1, 
-      name: 'main.js', 
-      content: '// Write your JavaScript code here\nconsole.log("Hello World");', language: 'javascript', folder: 'src' },
+    { id: 1, name: 'main.js', content: '// Write your JavaScript code here\nconsole.log("Hello World");', language: 'javascript', folder: 'src' },
     { id: 2, name: 'app.py', content: '# Write your Python code here\nprint("Hello World")', language: 'python', folder: 'src' },
-    { 
-  id: 3, 
-  name: 'main.cpp', 
-  content: '#include <iostream>\nusing namespace std;\n\nint main() {\n    // Print Hello World\n    cout << "Hello, World!" << endl;\n    return 0;\n}\n', 
-  language: 'cpp', 
-  folder: 'dsa' 
-},
+    { id: 3, name: 'styles.css', content: '/* Add your styles */\nbody { margin: 0; }', language: 'css', folder: 'assets' },
   ]);
   const [activeFile, setActiveFile] = useState(files[0]);
   const [openFiles, setOpenFiles] = useState([files[0]]);
@@ -36,19 +23,18 @@ const CodeIDE = () => {
   const [terminalInputValue, setTerminalInputValue] = useState('');
   const [terminalVisible, setTerminalVisible] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [expandedFolders, setExpandedFolders] = useState({ src: true, dsa: true });
-  const [folders, setFolders] = useState(['src', 'dsa']); // Track all folders
+  const [expandedFolders, setExpandedFolders] = useState({ src: true, assets: true });
+  const [folders, setFolders] = useState(['src', 'assets']); // Track all folders
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   // Mock user data
-  // const user = {
-  //   username: 'JohnDoe',
-  //   email: 'john.doe@example.com',
-  //   avatar: '',
-  //   plan: 'Free'
-  // };
-  const { user, signout } = useAuth();
-  
+  const user = {
+    username: 'JohnDoe',
+    email: 'john.doe@example.com',
+    avatar: '',
+    plan: 'Free'
+  };
+
   // Sophisticated Color Palette
   const colors = {
     dark: {
@@ -151,21 +137,10 @@ const CodeIDE = () => {
       setActiveFile(newOpenFiles.length > 0 ? newOpenFiles[newOpenFiles.length - 1] : null);
     }
   };
-   const handleEditorChange = (value) => {
-    const updatedFile = { ...activeFile, content: value };
-    setActiveFile(updatedFile);
-    setFiles(files.map(f => f.id === activeFile.id ? updatedFile : f));
-    setOpenFiles(openFiles.map(f => f.id === activeFile.id ? updatedFile : f));
-  };
 
-  const handleRunCode = async() => {
+  const handleRunCode = () => {
     if (!activeFile) return;
-    setOutputContent(`Running ${activeFile.name}...`);
-    console.log(activeFile);
-    
-    const input = terminalInputValue;
-    const res = await runTheCode(activeFile.language, activeFile.content , input)
-    setOutputContent(`${res.output}`);
+    setOutputContent(`Running ${activeFile.name}...\n${activeFile.content}\n\n[Execution completed]`);
     setErrorContent('');
     setTerminalTab('output');
     setTerminalVisible(true);
@@ -196,12 +171,6 @@ const CodeIDE = () => {
     return acc;
   }, {});
 
-  useEffect(()=>{
-    console.log(user);
-    
-    
-  },[])
-
   return (
     <div className="flex h-screen w-full" style={{ backgroundColor: c.bg, color: c.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       
@@ -219,7 +188,7 @@ const CodeIDE = () => {
           {!sidebarCollapsed && (
             <div className="flex items-center gap-2">
               <Code2 size={24} style={{ color: c.accent }} />
-              <span className="font-bold text-lg">HexaHub</span>
+              <span className="font-bold text-lg">CodeIDE</span>
             </div>
           )}
           <button
@@ -489,7 +458,6 @@ const CodeIDE = () => {
                       onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor = 'transparent';
                       }}
-                      onClick={signout}
                     >
                       <LogOut size={16} />
                       <span className="text-sm">Log out</span>
@@ -593,12 +561,22 @@ const CodeIDE = () => {
         >
           {activeFile ? (
             <div className="h-full p-6">
-              <MonacoEditor
-                key={activeFile.id}
+              <textarea
                 value={activeFile.content}
-                onChange={handleEditorChange}
-                language={activeFile.language}
-                theme={theme}
+                onChange={(e) => {
+                  const updatedFile = { ...activeFile, content: e.target.value };
+                  setActiveFile(updatedFile);
+                  setFiles(files.map(f => f.id === activeFile.id ? updatedFile : f));
+                  setOpenFiles(openFiles.map(f => f.id === activeFile.id ? updatedFile : f));
+                }}
+                className="w-full h-full font-mono text-sm p-4 rounded-lg border focus:outline-none resize-none"
+                style={{
+                  backgroundColor: c.bgSecondary,
+                  color: c.text,
+                  borderColor: c.border,
+                  lineHeight: '1.6'
+                }}
+                placeholder="Start typing your code..."
               />
             </div>
           ) : (

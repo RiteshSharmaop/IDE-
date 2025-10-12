@@ -14,7 +14,8 @@ export function AuthProvider({ children }) {
     lastLogin: "",
     theme: "dark",
     filesCreated: files.length || 0,
-    
+    plan: 'Free',
+    avatar: '',
   });
 
   const [loading, setLoading] = useState(true);

@@ -1,7 +1,7 @@
 // src/controllers/fileController.js
 const File = require('../models/File');
 const User = require('../models/User');
-const { redisUtils } = require('../config/redis');
+const { redisUtils, getRedisClient, cacheFile } = require('../config/redis');
 
 // Helper to get language from extension
 const getLanguageFromExtension = (filename) => {
@@ -25,7 +25,7 @@ const getLanguageFromExtension = (filename) => {
 // @route   POST /api/files
 exports.createFile = async (req, res) => {
   try {
-    const { name, content = '' } = req.body;
+    const { name, content = '', folder } = req.body;
 
     if (!name) {
       return res.status(400).json({
@@ -45,31 +45,33 @@ exports.createFile = async (req, res) => {
         message: 'File name is already exists'
       });
     }
-
+    
     const extension = name.split('.').pop();
     const language = getLanguageFromExtension(name);
-
+    
     // Create file
     const file = await File.create({
       name,
       content,
-      language,
+      lang:language,
       extension,
-      userId: req.user.id
+      userId: userId,
+      folder: folder || "src"
     });
-
+    
     // Update user's file count
-    await User.findByIdAndUpdate(req.user.id, {
+    await User.findByIdAndUpdate(userId, {
       $inc: { filesCreated: 1 }
     });
-
+    
+    console.log("Runn till heare,.....................");
     // Cache file in Redis (1 hour)
-    await redisUtils.setex(`file:${file._id}`, 3600, file);
-
+    await cacheFile(file._id.toString(), file, 3600);
+    
     // Increment user file count in Redis
-    const cacheKey = `user:${req.user.id}:fileCount`;
-    await redisUtils.incr(cacheKey);
-    await redisUtils.expire(cacheKey, 3600);
+    const cacheKey = `user:${userId}:fileCount`;
+    await getRedisClient().incr(cacheKey);
+    await getRedisClient().expire(cacheKey, 3600);
 
     res.status(201).json({
       success: true,

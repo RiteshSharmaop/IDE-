@@ -1,25 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { Play, Plus, FileCode, Moon, Sun, Terminal, X, Menu, Save, Users, Share2, Clock, Folder, Search, Settings, Code2, Layers, ChevronRight, ChevronDown, User, LogOut, Bell, CreditCard, Zap } from 'lucide-react';
+import React, { useState } from 'react';
+import { Play, Plus, FileCode, Moon, Sun, Terminal, X, Menu, Save, Users, Share2, Clock, Folder, Search, Settings, Code2, Layers, ChevronRight, ChevronDown } from 'lucide-react';
 
-import { MonacoEditor } from '../components/Editor/MonacoEditor';
-import { runTheCode } from '../lib/codeExecute';
-import { useAuth } from '../lib/auth';
-
-const CodeIDE = () => {
- const [theme, setTheme] = useState('dark');
+const IDE2 = () => {
+  const [theme, setTheme] = useState('dark');
   const [files, setFiles] = useState([
-    { 
-      id: 1, 
-      name: 'main.js', 
-      content: '// Write your JavaScript code here\nconsole.log("Hello World");', language: 'javascript', folder: 'src' },
+    { id: 1, name: 'main.js', content: '// Write your JavaScript code here\nconsole.log("Hello World");', language: 'javascript', folder: 'src' },
     { id: 2, name: 'app.py', content: '# Write your Python code here\nprint("Hello World")', language: 'python', folder: 'src' },
-    { 
-  id: 3, 
-  name: 'main.cpp', 
-  content: '#include <iostream>\nusing namespace std;\n\nint main() {\n    // Print Hello World\n    cout << "Hello, World!" << endl;\n    return 0;\n}\n', 
-  language: 'cpp', 
-  folder: 'dsa' 
-},
+    { id: 3, name: 'styles.css', content: '/* Add your styles */\nbody { margin: 0; }', language: 'css', folder: 'assets' },
   ]);
   const [activeFile, setActiveFile] = useState(files[0]);
   const [openFiles, setOpenFiles] = useState([files[0]]);
@@ -36,19 +23,8 @@ const CodeIDE = () => {
   const [terminalInputValue, setTerminalInputValue] = useState('');
   const [terminalVisible, setTerminalVisible] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [expandedFolders, setExpandedFolders] = useState({ src: true, dsa: true });
-  const [folders, setFolders] = useState(['src', 'dsa']); // Track all folders
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [expandedFolders, setExpandedFolders] = useState({ src: true, assets: true });
 
-  // Mock user data
-  // const user = {
-  //   username: 'JohnDoe',
-  //   email: 'john.doe@example.com',
-  //   avatar: '',
-  //   plan: 'Free'
-  // };
-  const { user, signout } = useAuth();
-  
   // Sophisticated Color Palette
   const colors = {
     dark: {
@@ -126,9 +102,7 @@ const CodeIDE = () => {
   };
 
   const handleCreateFolder = () => {
-    if (newFolderName.trim() && !folders.includes(newFolderName)) {
-      // Add the folder to the folders list
-      setFolders(prev => [...prev, newFolderName]);
+    if (newFolderName.trim()) {
       // Add the folder to expandedFolders
       setExpandedFolders(prev => ({ ...prev, [newFolderName]: true }));
       setNewFolderName('');
@@ -151,21 +125,10 @@ const CodeIDE = () => {
       setActiveFile(newOpenFiles.length > 0 ? newOpenFiles[newOpenFiles.length - 1] : null);
     }
   };
-   const handleEditorChange = (value) => {
-    const updatedFile = { ...activeFile, content: value };
-    setActiveFile(updatedFile);
-    setFiles(files.map(f => f.id === activeFile.id ? updatedFile : f));
-    setOpenFiles(openFiles.map(f => f.id === activeFile.id ? updatedFile : f));
-  };
 
-  const handleRunCode = async() => {
+  const handleRunCode = () => {
     if (!activeFile) return;
-    setOutputContent(`Running ${activeFile.name}...`);
-    console.log(activeFile);
-    
-    const input = terminalInputValue;
-    const res = await runTheCode(activeFile.language, activeFile.content , input)
-    setOutputContent(`${res.output}`);
+    setOutputContent(`Running ${activeFile.name}...\n${activeFile.content}\n\n[Execution completed]`);
     setErrorContent('');
     setTerminalTab('output');
     setTerminalVisible(true);
@@ -190,17 +153,12 @@ const CodeIDE = () => {
     setExpandedFolders(prev => ({ ...prev, [folder]: !prev[folder] }));
   };
 
-  // Group files by folder and ensure all folders are shown
-  const groupedFiles = folders.reduce((acc, folder) => {
-    acc[folder] = files.filter(file => file.folder === folder);
+  const groupedFiles = files.reduce((acc, file) => {
+    const folder = file.folder || 'root';
+    if (!acc[folder]) acc[folder] = [];
+    acc[folder].push(file);
     return acc;
   }, {});
-
-  useEffect(()=>{
-    console.log(user);
-    
-    
-  },[])
 
   return (
     <div className="flex h-screen w-full" style={{ backgroundColor: c.bg, color: c.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -219,7 +177,7 @@ const CodeIDE = () => {
           {!sidebarCollapsed && (
             <div className="flex items-center gap-2">
               <Code2 size={24} style={{ color: c.accent }} />
-              <span className="font-bold text-lg">HexaHub</span>
+              <span className="font-bold text-lg">IDE2</span>
             </div>
           )}
           <button
@@ -263,7 +221,7 @@ const CodeIDE = () => {
               <div className="px-2 py-1 text-xs font-semibold uppercase" style={{ color: c.textDim }}>
                 Explorer
               </div>
-              {folders.map(folder => (
+              {Object.entries(groupedFiles).map(([folder, folderFiles]) => (
                 <div key={folder}>
                   <button
                     onClick={() => toggleFolder(folder)}
@@ -273,15 +231,10 @@ const CodeIDE = () => {
                     {expandedFolders[folder] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                     <Folder size={16} style={{ color: c.accent }} />
                     <span className="text-sm font-medium">{folder}</span>
-                    {groupedFiles[folder] && groupedFiles[folder].length > 0 && (
-                      <span className="ml-auto text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: c.bgTertiary, color: c.textMuted }}>
-                        {groupedFiles[folder].length}
-                      </span>
-                    )}
                   </button>
-                  {expandedFolders[folder] && groupedFiles[folder] && groupedFiles[folder].length > 0 && (
+                  {expandedFolders[folder] && (
                     <div className="ml-6 space-y-0.5">
-                      {groupedFiles[folder].map(file => (
+                      {folderFiles.map(file => (
                         <button
                           key={file.id}
                           onClick={() => handleFileClick(file)}
@@ -298,11 +251,6 @@ const CodeIDE = () => {
                           <span className="text-sm truncate">{file.name}</span>
                         </button>
                       ))}
-                    </div>
-                  )}
-                  {expandedFolders[folder] && (!groupedFiles[folder] || groupedFiles[folder].length === 0) && (
-                    <div className="ml-6 px-2 py-2 text-xs italic" style={{ color: c.textDim }}>
-                      Empty folder
                     </div>
                   )}
                 </div>
@@ -332,172 +280,14 @@ const CodeIDE = () => {
 
         {/* Sidebar Footer */}
         {!sidebarCollapsed && (
-          <div className="border-t" style={{ borderColor: c.border }}>
-            <div className="relative">
-              <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="w-full flex items-center gap-3 p-3 transition-all hover:opacity-90"
-                style={{ backgroundColor: userMenuOpen ? c.bgTertiary : 'transparent' }}
-              >
-                <div 
-                  className="flex items-center justify-center h-8 w-8 rounded-full font-semibold text-sm"
-                  style={{ 
-                    background: 'linear-gradient(135deg, #B0C4DE 0%, #8A9AAA 100%)',
-                    color: theme === 'dark' ? c.bg : '#FFFFFF'
-                  }}
-                >
-                  {user.username[0]}
-                </div>
-                <div className="flex flex-col gap-0.5 leading-none flex-1 text-left">
-                  <span className="font-medium text-sm" style={{ color: c.text }}>{user.username}</span>
-                  <span className="text-xs" style={{ color: c.textDim }}>{user.email}</span>
-                </div>
-                <ChevronDown 
-                  className="h-4 w-4 transition-transform" 
-                  style={{ 
-                    color: c.textMuted,
-                    transform: userMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)'
-                  }} 
-                />
-              </button>
-
-              {/* User Dropdown Menu */}
-              {userMenuOpen && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-30" 
-                    onClick={() => setUserMenuOpen(false)}
-                  />
-                  <div 
-                    className="absolute bottom-full left-0 right-0 mb-2 mx-2 rounded-lg border shadow-2xl z-40 overflow-hidden"
-                    style={{ backgroundColor: c.bg, borderColor: c.border }}
-                  >
-                    {/* User Info Header */}
-                    <div className="p-4 border-b" style={{ borderColor: c.border }}>
-                      <div className="flex items-center gap-3">
-                        <div 
-                          className="flex items-center justify-center h-12 w-12 rounded-full font-bold"
-                          style={{ 
-                            background: 'linear-gradient(135deg, #B0C4DE 0%, #8A9AAA 100%)',
-                            color: theme === 'dark' ? c.bg : '#FFFFFF'
-                          }}
-                        >
-                          {user.username[0]}
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <span className="font-semibold" style={{ color: c.text }}>{user.username}</span>
-                          <span className="text-xs" style={{ color: c.textDim }}>{user.email}</span>
-                          <span className="text-xs font-medium" style={{ color: c.accent }}>{user.plan} Plan</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Upgrade Option */}
-                    <button
-                      className="w-full flex items-center gap-3 p-3 transition-all"
-                      style={{ 
-                        backgroundColor: 'transparent',
-                        color: c.text
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = c.bgTertiary;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }}
-                    >
-                      <div 
-                        className="flex h-9 w-9 items-center justify-center rounded-lg"
-                        style={{ 
-                          background: 'linear-gradient(135deg, #B0C4DE 0%, #8A9AAA 100%)'
-                        }}
-                      >
-                        <Zap size={16} style={{ color: theme === 'dark' ? c.bg : '#FFFFFF' }} />
-                      </div>
-                      <div className="flex flex-col gap-0.5 text-left">
-                        <span className="font-medium text-sm">Upgrade Plan</span>
-                        <span className="text-xs" style={{ color: c.textDim }}>Unlock all features</span>
-                      </div>
-                    </button>
-
-                    <div className="border-t" style={{ borderColor: c.border }} />
-
-                    {/* Menu Items */}
-                    <button
-                      className="w-full flex items-center gap-3 px-4 py-2.5 transition-all"
-                      style={{ 
-                        backgroundColor: 'transparent',
-                        color: c.text
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = c.bgTertiary;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }}
-                    >
-                      <CreditCard size={16} />
-                      <span className="text-sm">Billing</span>
-                    </button>
-
-                    <button
-                      className="w-full flex items-center gap-3 px-4 py-2.5 transition-all"
-                      style={{ 
-                        backgroundColor: 'transparent',
-                        color: c.text
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = c.bgTertiary;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }}
-                    >
-                      <Bell size={16} />
-                      <span className="text-sm">Notifications</span>
-                    </button>
-
-                    <button
-                      className="w-full flex items-center gap-3 px-4 py-2.5 transition-all"
-                      style={{ 
-                        backgroundColor: 'transparent',
-                        color: c.text
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = c.bgTertiary;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }}
-                    >
-                      <Settings size={16} />
-                      <span className="text-sm">Settings</span>
-                    </button>
-
-                    <div className="border-t" style={{ borderColor: c.border }} />
-
-                    {/* Logout */}
-                    <button
-                      className="w-full flex items-center gap-3 px-4 py-2.5 transition-all"
-                      style={{ 
-                        backgroundColor: 'transparent',
-                        color: c.error
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = theme === 'dark' ? 'rgba(210, 180, 140, 0.1)' : 'rgba(139, 115, 85, 0.1)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }}
-                      onClick={signout}
-                    >
-                      <LogOut size={16} />
-                      <span className="text-sm">Log out</span>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+          <div className="p-3 border-t space-y-2" style={{ borderColor: c.border }}>
+            <button
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:opacity-80"
+              style={{ backgroundColor: c.bgTertiary, color: c.text }}
+            >
+              <Settings size={16} />
+              <span className="text-sm">Settings</span>
+            </button>
           </div>
         )}
       </aside>
@@ -593,12 +383,22 @@ const CodeIDE = () => {
         >
           {activeFile ? (
             <div className="h-full p-6">
-              <MonacoEditor
-                key={activeFile.id}
+              <textarea
                 value={activeFile.content}
-                onChange={handleEditorChange}
-                language={activeFile.language}
-                theme={theme}
+                onChange={(e) => {
+                  const updatedFile = { ...activeFile, content: e.target.value };
+                  setActiveFile(updatedFile);
+                  setFiles(files.map(f => f.id === activeFile.id ? updatedFile : f));
+                  setOpenFiles(openFiles.map(f => f.id === activeFile.id ? updatedFile : f));
+                }}
+                className="w-full h-full font-mono text-sm p-4 rounded-lg border focus:outline-none resize-none"
+                style={{
+                  backgroundColor: c.bgSecondary,
+                  color: c.text,
+                  borderColor: c.border,
+                  lineHeight: '1.6'
+                }}
+                placeholder="Start typing your code..."
               />
             </div>
           ) : (
@@ -608,10 +408,7 @@ const CodeIDE = () => {
                 <p className="text-xl font-semibold mb-2" style={{ color: c.text }}>No File Open</p>
                 <p className="text-sm mb-6" style={{ color: c.textMuted }}>Select a file or create a new one</p>
                 <button
-                  onClick={() => {
-                    setIsCreatingFile(true);
-                    setSelectedFolder('src');
-                  }}
+                  onClick={() => setIsCreatingFile(true)}
                   className="flex items-center gap-2 mx-auto px-6 py-3 rounded-lg transition-all hover:opacity-90"
                   style={{ backgroundColor: c.accent, color: theme === 'dark' ? c.bg : '#FFFFFF' }}
                 >
@@ -725,7 +522,7 @@ const CodeIDE = () => {
           >
             <h3 className="text-lg font-semibold mb-4" style={{ color: c.text }}>Create New File</h3>
             
-              <div className="mb-4">
+            <div className="mb-4">
               <label className="block text-sm font-medium mb-2" style={{ color: c.textMuted }}>
                 Select Folder
               </label>
@@ -735,7 +532,7 @@ const CodeIDE = () => {
                 className="w-full px-4 py-2 rounded-lg border focus:outline-none"
                 style={{ backgroundColor: c.bgSecondary, borderColor: c.border, color: c.text }}
               >
-                {folders.map(folder => (
+                {Object.keys(groupedFiles).map(folder => (
                   <option key={folder} value={folder}>{folder}</option>
                 ))}
               </select>
@@ -835,4 +632,4 @@ const CodeIDE = () => {
   );
 };
 
-export default CodeIDE;
+export default IDE2;

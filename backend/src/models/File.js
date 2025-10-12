@@ -13,10 +13,20 @@ const fileSchema = new mongoose.Schema({
     default: '',
     maxlength: [1000000, 'File content cannot exceed 1MB'] // 1MB limit
   },
-  language: {
+  extension: {
+    type: String,
+    trim: true,
+    maxlength: [10, 'File extension cannot exceed 10 characters']
+  },
+  lang: {
     type: String,
     enum: ['javascript', 'python', 'cpp', 'c', 'java', 'csharp', 'text'],
     default: 'text'
+  },
+  folder:{
+    type: String,
+    default: 'root'
+    
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -47,10 +57,10 @@ const fileSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  tags: [{
-    type: String,
-    trim: true
-  }]
+  // tags: [{
+  //   type: String,
+  //   trim: true
+  // }]
 }, {
   timestamps: true
 });
