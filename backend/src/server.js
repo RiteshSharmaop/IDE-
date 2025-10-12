@@ -7,7 +7,7 @@ const rateLimit = require("express-rate-limit");
 require("dotenv").config();
 
 const connectDB = require("./config/database");
-const { connectRedis } = require("./config/redis");
+// const { connectRedis } = require("./config/redis");
 
 // Import routes
 const authRoutes = require("./routes/auth");
@@ -18,7 +18,7 @@ const app = express();
 
 // Connect to databases
 connectDB();
-connectRedis();
+// connectRedis();
 
 // Middleware
 app.use(helmet());
@@ -39,6 +39,9 @@ const limiter = rateLimit({
   message: "Too many requests from this IP, please try again later.",
 });
 app.use("/api/", limiter);
+
+
+
 
 // Routes
 app.use("/api/auth", authRoutes);

@@ -12,7 +12,7 @@ services:
       MONGO_INITDB_DATABASE: code-ide
 
   redis:
-    image: redis:alpine
+    image: redis/redis-stack
     container_name: code-ide-redis
     ports:
       - "6379:6379"

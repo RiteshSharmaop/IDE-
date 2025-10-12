@@ -1,5 +1,7 @@
 const { exec } = require("child_process");
 const { promisify } = require("util");
+const { runPythonCode } = require("./executors/python");
+const { runJavascriptCode } = require("./executors/javascript");
 const execPromise = promisify(exec);
 
 class DockerExecutor {
@@ -41,58 +43,38 @@ class DockerExecutor {
   async executeInDocker(code, language, input = "") {
     await this.startContainer();
 
-    const tempFile = `/tmp/code_${Date.now()}`;
-    const commands = this.getCommands(language, tempFile);
-    console.log("Code by user:", code);
+    let result;
+    let output, error, success;
+    
+    switch (language) {
+      case "python":
+        
+        result = await runPythonCode(code, input);
+        break;
 
-    try {
-      // Write code to temp file using echo (simplified approach)
-      const sanitizedCode = code.replace(/"/g, '\\"'); // Escape double quotes
-      const writeCmd = `docker exec -i ${this.containerName} bash -c "echo \\"${sanitizedCode}\\" > ${tempFile}${commands.extension}"`;
-      console.log("Write Command:", writeCmd);
-      await execPromise(writeCmd);
+      case "javascript":
+        result = await runJavascriptCode(code, input);
+        break;
 
-      // Compile step (if needed)
-      if (commands.compile) {
-        const compileCmd = `docker exec -i ${this.containerName} bash -c "${commands.compile}"`;
-        console.log("Compile Command:", compileCmd);
-        await execPromise(compileCmd, { timeout: this.timeout / 2 });
-      }
+      // case "java":
+      //   result = await DockerExecutor.executeInDocker(code, "java", input);
+      //   break;
 
-      // Execute the program, piping input if present
-      const sanitizedInput = input.replace(/'/g, "'\\''"); // Escape single quotes
-      const executeCmd = `docker exec -i ${this.containerName} bash -c "echo '${sanitizedInput}' | ${commands.execute}"`;
-      console.log("Execute Command:", executeCmd);
-
-      const { stdout, stderr } = await execPromise(executeCmd, {
-        timeout: this.timeout,
-        maxBuffer: 1024 * 1024, // 1 MB output limit
-      });
-
-      // Cleanup temporary files
-      await execPromise(
-        `docker exec -i ${this.containerName} bash -c "rm -f ${tempFile}* || true"`
-      );
-
-      return {
-        success: !stderr || stderr.trim() === "",
-        output: stdout.trim(),
-        error: stderr.trim(),
-      };
-    } catch (error) {
-      // Cleanup on failure
-      try {
-        await execPromise(
-          `docker exec -i ${this.containerName} bash -c "rm -f ${tempFile}* || true"`
-        );
-      } catch {}
-
-      return {
-        success: false,
-        output: error.stdout?.trim() || "",
-        error: error.stderr?.trim() || error.message,
-      };
+      // Add more languages as needed
+      default:
+        console.log(`Language ${language} not supported`);
+        result = { success: false, output: "", error: "Unsupported language" };
     }
+
+    // Store returned data in variables
+    output = result.output;
+    error = result.error;
+    success = result.success;
+
+    console.log("Success:", success);
+    console.log("Output:", output);
+    console.log("Error:", error);
+    return { success, output, error };
   }
 
   // ✅ Language-specific compile and run commands
@@ -109,12 +91,12 @@ class DockerExecutor {
       cpp: {
         extension: ".cpp",
         compile: `g++ ${tempFile}.cpp -o ${tempFile}.out`,
-        execute: `${tempFile}.out`,
+        execute: `./${tempFile}.out`,
       },
       c: {
         extension: ".c",
         compile: `gcc ${tempFile}.c -o ${tempFile}.out`,
-        execute: `${tempFile}.out`,
+        execute: `./${tempFile}.out`,
       },
       java: {
         extension: ".java",
