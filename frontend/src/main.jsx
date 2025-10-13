@@ -4,8 +4,8 @@ import "./index.css";
 import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./lib/auth";
-import { SocketProvider } from "./context/SocketContext.jsx";
 import { RoomProvider } from "./context/RoomContext.jsx";
+import { SocketProvider } from "./context/SocketContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

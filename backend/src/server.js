@@ -1,9 +1,9 @@
-// src/server.js
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
+const { createServer } = require("node:http");
 require("dotenv").config();
 
 const connectDB = require("./config/database");
@@ -15,7 +15,9 @@ const fileRoutes = require("./routes/files");
 const executeRoutes = require("./routes/execute");
 const { roomRouter } = require("./routes/room");
 
+// Create Express app and HTTP server
 const app = express();
+const httpServer = createServer(app);
 
 // Connect to databases
 connectDB();
@@ -35,14 +37,11 @@ app.use(morgan("dev"));
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: "Too many requests from this IP, please try again later.",
 });
 app.use("/api/", limiter);
-
-
-
 
 // Routes
 app.use("/api/auth", authRoutes);
@@ -50,15 +49,14 @@ app.use("/api/files", fileRoutes);
 app.use("/api/execute", executeRoutes);
 app.use("/api/room", roomRouter);
 
-// Health check
+// Health check route
 app.get("/api/health", (req, res) => {
   res.status(200).json({
-    status: "ide server is healthy and running",
+    status: "IDE server is healthy and running",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });
 });
-
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -78,11 +76,15 @@ app.use((req, res) => {
   });
 });
 
+// Import socket configuration
+const { initSocket } = require("./socket");
+initSocket(httpServer);
+
 const PORT = process.env.PORT || 8080;
 
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📝 Environment: ${process.env.NODE_ENV}`);
 });
 
-module.exports = app;
+module.exports = { app, httpServer };

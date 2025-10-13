@@ -4,6 +4,8 @@ import { Play, Plus, FileCode, Moon, Sun, Terminal, X, Menu, Save, Users, Share2
 import { MonacoEditor } from '../components/Editor/MonacoEditor';
 import { runTheCode } from '../lib/codeExecute';
 import { useAuth } from '../lib/auth';
+import { useSocket } from '../context/SocketContext';
+import { useNavigate } from 'react-router-dom';
 
 const CodeIDE = () => {
  const [theme, setTheme] = useState('dark');
@@ -39,7 +41,7 @@ const CodeIDE = () => {
   const [expandedFolders, setExpandedFolders] = useState({ src: true, dsa: true });
   const [folders, setFolders] = useState(['src', 'dsa']); // Track all folders
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-
+  const navigate = useNavigate()
   // Mock user data
   // const user = {
   //   username: 'JohnDoe',
@@ -95,6 +97,46 @@ const CodeIDE = () => {
     };
     return langColors[lang] || c.textMuted;
   };
+
+  
+  const {socket , socketId} = useSocket();
+  
+  useEffect(() => {
+      if(!socket.id ){
+          navigate("/");
+      }
+      console.log("IDE SocketID : " , socketId);
+      return () => socket.off("receiveMessage");
+  }, [socket, socketId]);
+
+   useEffect(() => {
+      if (!socket) return;
+
+      socket.on("joinedRoom", ({ roomId }) => {
+        console.log(`✅ Joined room ${roomId}`);
+      });
+
+      socket.on("someoneJoined", ({ socketId }) => {
+        console.log(`👋 Someone joined the room: ${socketId}`);
+      });
+
+      return () => {
+        socket.off("joinedRoom");
+        socket.off("someoneJoined");
+      };
+    }, [socket]);
+    
+    
+  //   useEffect(() => {
+  //       if (!socket.connected) {
+  //           socket.on("connect", () => {
+  //               setSocketId(socket.id);
+  //               console.log("Socket connected with ID:", socket.id);
+  //           });
+  //       } else {
+  //           setSocketId(socket.id);
+  //       }
+  //   }, []);
 
   const getLanguageFromExtension = (filename) => {
     const ext = filename.split('.').pop().toLowerCase();

@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import LightRays from "../components/LightRays";
 import CardNav from "../components/CardNav";
 import VariableProximity from "../components/VariableProximity";
@@ -6,25 +6,40 @@ import logo from "../assets/logo.png";
 import LiquidEther from "../components/LiquidEther";
 import { Link } from "react-router-dom";
 
+import { useSocket } from "../context/SocketContext";
+
 const StartingPage = () => {
     const containerRef = useRef(null);
+    const {socket , socketId} = useSocket();
+
+    useEffect(() => {
+        if (!socket) return;
+
+        console.log("SocketID : " , socketId);
+    
+
+        return () => socket.off("receiveMessage");
+    }, [socket, socketId]);
+
+   
+
     const content =
         "HexaHub is a collaborative IDE\nbuilt for real-time coding,\nsharing, and teamwork.";
     return (
         <div className="relative w-full h-screen overflow-hidden bg-[#06000F]">
             {/* Light rays background */}
             <LightRays
-        raysOrigin="top-center"
-        raysColor="#bebadb"
-        raysSpeed={1.5}
-        lightSpread={0.8}
-        rayLength={1.2}
-        followMouse={true}
-        mouseInfluence={0.1}
-        noiseAmount={0.1}
-        distortion={0.05}
-        className="custom-rays"
-      />
+                raysOrigin="top-center"
+                raysColor="#bebadb"
+                raysSpeed={1.5}
+                lightSpread={0.8}
+                rayLength={1.2}
+                followMouse={true}
+                mouseInfluence={0.1}
+                noiseAmount={0.1}
+                distortion={0.05}
+                className="custom-rays"
+            />
             {/* <div style={{ width: "100%", height: "100%", position: "relative" }}>
                 <LiquidEther
                     colors={["#5227FF", "#FF9FFC", "#B19EEF"]}
@@ -67,7 +82,7 @@ const StartingPage = () => {
                             type="button"
                             className="bg-white cursor-pointer hover:bg-[#cbcaca] text-black px-6 py-3 rounded-full font-medium shadow-sm hover:opacity-95"
                             aria-label="Sign in"
-                            >
+                        >
                             Sign In
                         </Link>
 

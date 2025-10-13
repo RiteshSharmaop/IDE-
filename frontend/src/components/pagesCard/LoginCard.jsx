@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../../lib/api";
 import { useAuth } from "../../lib/auth";
@@ -24,9 +24,46 @@ export function LoginCard() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
   const { signin } = useAuth();
-  // const {socketId , setSocketId} = useSocket();
+  const {socket , socketId , setSocketId} = useSocket();
   const { roomId, setRoomId } = useRoom();
 
+   useEffect(() => {
+    // connect to socket      
+    if (!socket) return;
+
+  
+          console.log("SocketID : " , socketId);
+      
+  
+          return () => socket.off("receiveMessage");
+      }, [socket, socketId]);
+  
+    useEffect(() => {
+      if (!socket) return;
+
+      socket.on("joinedRoom", ({ roomId }) => {
+        console.log(`✅ Joined room ${roomId}`);
+      });
+
+      socket.on("someoneJoined", ({ socketId }) => {
+        console.log(`👋 Someone joined the room: ${socketId}`);
+      });
+
+      return () => {
+        socket.off("joinedRoom");
+        socket.off("someoneJoined");
+      };
+    }, [socket]);
+ 
+
+  const joinRoom = async(roomId)=>{
+    // Join the room via socket
+    socket.emit("joinRoom", { roomId });
+    console.log("Joined Room");
+    
+    // console.log(`${socketId} joinded room ${roomId}`);
+
+  };
   const handleLogin = async (e) => {
     e?.preventDefault();
     setLoading(true);
@@ -40,6 +77,9 @@ export function LoginCard() {
         console.log("roomID ", createdRoomId);
         const user = res.data.data?.user;
         if (token) signin(token, user);
+        await joinRoom(createdRoomId)
+        setRoomId(createdRoomId)
+        
         navigate(`/e/${createdRoomId}`);
       } else {
         setError(res?.data?.message || "Login failed");
@@ -50,18 +90,22 @@ export function LoginCard() {
       setLoading(false);
     }
   };
-
+  
   const handleLoginAndJoinRoom = async (e) => {
     e?.preventDefault();
     setLoading(true);
     setError(null);
-
+    
     try {
       const res = await api.post("/api/auth/signin", { email, password });
       if (res?.data?.success) {
         const token = res.data.data?.token;
         const user = res.data.data?.user;
         if (token) signin(token, user);
+        
+        await joinRoom(roomId);
+        setRoomId(roomId)
+        
         navigate(`/e/${roomId}`);
       } else {
         setError(res?.data?.message || "Login failed");

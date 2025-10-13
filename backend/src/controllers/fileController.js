@@ -1,7 +1,15 @@
 // src/controllers/fileController.js
 const File = require('../models/File');
 const User = require('../models/User');
-const { redisUtils, getRedisClient, cacheFile } = require('../config/redis');
+const { 
+  getRedisClient,
+  cacheFile,
+  getCachedFile,
+  cacheFilesList,
+  getCachedFilesList,
+  invalidateUserFilesCache,
+  invalidateFileCache
+} = require('../config/redis');
 
 // Helper to get language from extension
 const getLanguageFromExtension = (filename) => {
@@ -91,14 +99,74 @@ exports.createFile = async (req, res) => {
 
 // @desc    Get all user files
 // @route   GET /api/files
+// exports.getFiles = async (req, res) => {
+//   try {
+//     const { page = 1, limit = 50, search = '' } = req.query;
+
+//     // Check Redis cache first
+//     const cacheKey = `user:${req.user.id}:files:${page}:${search}`;
+//     const cachedFiles = await redisUtils.get(cacheKey);
+
+//     if (cachedFiles) {
+//       return res.json({
+//         success: true,
+//         data: cachedFiles,
+//         cached: true
+//       });
+//     }
+
+//     // Build query
+//     const query = {
+//       userId: req.user.id,
+//       isDeleted: false
+//     };
+
+//     if (search) {
+//       query.name = { $regex: search, $options: 'i' };
+//     }
+
+//     // Get files from database
+//     const files = await File.find(query)
+//       .sort({ createdAt: -1 })
+//       .limit(limit * 1)
+//       .skip((page - 1) * limit)
+//       .select('-__v');
+
+//     const count = await File.countDocuments(query);
+
+//     const result = {
+//       files,
+//       totalPages: Math.ceil(count / limit),
+//       currentPage: page,
+//       total: count
+//     };
+
+//     // Cache for 5 minutes
+//     await redisUtils.setex(cacheKey, 300, result);
+
+//     res.json({
+//       success: true,
+//       data: result
+//     });
+
+//   } catch (error) {
+//     console.error('Get files error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Error fetching files',
+//       error: error.message
+//     });
+//   }
+// };
+// @desc    Get all user files
+// @route   GET /api/files
 exports.getFiles = async (req, res) => {
   try {
     const { page = 1, limit = 50, search = '' } = req.query;
+    const userId = req.user.id || req.user._id;
 
-    // Check Redis cache first
-    const cacheKey = `user:${req.user.id}:files:${page}:${search}`;
-    const cachedFiles = await redisUtils.get(cacheKey);
-
+    // ✅ Check Redis cache first
+    const cachedFiles = await getCachedFilesList(userId, page, search);
     if (cachedFiles) {
       return res.json({
         success: true,
@@ -108,16 +176,12 @@ exports.getFiles = async (req, res) => {
     }
 
     // Build query
-    const query = {
-      userId: req.user.id,
-      isDeleted: false
-    };
-
+    const query = { userId, isDeleted: false };
     if (search) {
       query.name = { $regex: search, $options: 'i' };
     }
 
-    // Get files from database
+    // Fetch from MongoDB
     const files = await File.find(query)
       .sort({ createdAt: -1 })
       .limit(limit * 1)
@@ -133,8 +197,8 @@ exports.getFiles = async (req, res) => {
       total: count
     };
 
-    // Cache for 5 minutes
-    await redisUtils.setex(cacheKey, 300, result);
+    // ✅ Cache the files list (5 minutes)
+    await cacheFilesList(userId, page, search, result);
 
     res.json({
       success: true,
@@ -150,6 +214,7 @@ exports.getFiles = async (req, res) => {
     });
   }
 };
+
 
 // @desc    Get single file
 // @route   GET /api/files/:id
@@ -202,17 +267,116 @@ exports.getFile = async (req, res) => {
 
 // @desc    Update file
 // @route   PUT /api/files/:id
+// exports.updateFile = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { name, content } = req.body;
+
+//     const file = await File.findOne({
+//       _id: id,
+//       userId: req.user.id,
+//       isDeleted: false
+//     });
+
+//     if (!file) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'File not found'
+//       });
+//     }
+
+//     // Update fields
+//     if (name) {
+//       file.name = name;
+//       file.extension = name.split('.').pop();
+//       file.language = getLanguageFromExtension(name);
+//     }
+//     if (content !== undefined) {
+//       file.content = content;
+//     }
+
+//     await file.save();
+
+//     // Update cache
+//     await redisUtils.setex(`file:${id}`, 3600, file);
+
+//     // Invalidate user files list cache
+//     const cachePattern = `user:${req.user.id}:files:*`;
+//     // Note: In production, you'd want to use SCAN to delete pattern matches
+    
+//     res.json({
+//       success: true,
+//       message: 'File updated successfully',
+//       data: { file }
+//     });
+
+//   } catch (error) {
+//     console.error('Update file error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Error updating file',
+//       error: error.message
+//     });
+//   }
+// };
+
+
+
+// @desc    Delete file
+// @route   DELETE /api/files/:id
+// exports.deleteFile = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     const file = await File.findOne({
+//       _id: id,
+//       userId: req.user.id,
+//       isDeleted: false
+//     });
+
+//     if (!file) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'File not found'
+//       });
+//     }
+
+//     // Soft delete
+//     file.isDeleted = true;
+//     await file.save();
+
+//     // Remove from cache
+//     await redisUtils.del(`file:${id}`);
+
+//     // Decrement user file count
+//     await User.findByIdAndUpdate(req.user.id, {
+//       $inc: { filesCreated: -1 }
+//     });
+
+//     res.json({
+//       success: true,
+//       message: 'File deleted successfully'
+//     });
+
+//   } catch (error) {
+//     console.error('Delete file error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Error deleting file',
+//       error: error.message
+//     });
+//   }
+// };
+
+// @desc    Update file
+// @route   PUT /api/files/:id
 exports.updateFile = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, content } = req.body;
+    const userId = req.user.id;
 
-    const file = await File.findOne({
-      _id: id,
-      userId: req.user.id,
-      isDeleted: false
-    });
-
+    const file = await File.findOne({ _id: id, userId, isDeleted: false });
     if (!file) {
       return res.status(404).json({
         success: false,
@@ -220,25 +384,19 @@ exports.updateFile = async (req, res) => {
       });
     }
 
-    // Update fields
     if (name) {
       file.name = name;
       file.extension = name.split('.').pop();
       file.language = getLanguageFromExtension(name);
     }
-    if (content !== undefined) {
-      file.content = content;
-    }
-
+    if (content !== undefined) file.content = content;
     await file.save();
 
-    // Update cache
-    await redisUtils.setex(`file:${id}`, 3600, file);
+    // ✅ Update cache for this file
+    await cacheFile(id, file, 3600);
+    // ✅ Invalidate user's files list cache
+    await invalidateUserFilesCache(userId);
 
-    // Invalidate user files list cache
-    const cachePattern = `user:${req.user.id}:files:*`;
-    // Note: In production, you'd want to use SCAN to delete pattern matches
-    
     res.json({
       success: true,
       message: 'File updated successfully',
@@ -260,13 +418,9 @@ exports.updateFile = async (req, res) => {
 exports.deleteFile = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.id;
 
-    const file = await File.findOne({
-      _id: id,
-      userId: req.user.id,
-      isDeleted: false
-    });
-
+    const file = await File.findOne({ _id: id, userId, isDeleted: false });
     if (!file) {
       return res.status(404).json({
         success: false,
@@ -274,17 +428,15 @@ exports.deleteFile = async (req, res) => {
       });
     }
 
-    // Soft delete
     file.isDeleted = true;
     await file.save();
 
-    // Remove from cache
-    await redisUtils.del(`file:${id}`);
+    // ✅ Remove cache
+    await invalidateFileCache(id);
+    await invalidateUserFilesCache(userId);
 
-    // Decrement user file count
-    await User.findByIdAndUpdate(req.user.id, {
-      $inc: { filesCreated: -1 }
-    });
+    // ✅ Decrement file count
+    await User.findByIdAndUpdate(userId, { $inc: { filesCreated: -1 } });
 
     res.json({
       success: true,
@@ -300,3 +452,4 @@ exports.deleteFile = async (req, res) => {
     });
   }
 };
+

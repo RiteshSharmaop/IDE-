@@ -11,9 +11,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { useSocket } from "../../context/SocketContext";
+import { useRoom } from "../../context/RoomContext";
 
 export function SignupCard() {
   const [username, setUsername] = useState("");
@@ -24,6 +26,47 @@ export function SignupCard() {
   const navigate = useNavigate();
   const { signin } = useAuth();
 
+
+   const {socket , socketId , setSocketId} = useSocket();
+    const { roomId, setRoomId } = useRoom();
+  
+     useEffect(() => {
+      // connect to socket      
+      if (!socket) return;
+  
+    
+            console.log("SocketID : " , socketId);
+        
+    
+            return () => socket.off("receiveMessage");
+        }, [socket, socketId]);
+    
+      useEffect(() => {
+        if (!socket) return;
+  
+        socket.on("joinedRoom", ({ roomId }) => {
+          console.log(`✅ Joined room ${roomId}`);
+        });
+  
+        socket.on("someoneJoined", ({ socketId }) => {
+          console.log(`👋 Someone joined the room: ${socketId}`);
+        });
+  
+        return () => {
+          socket.off("joinedRoom");
+          socket.off("someoneJoined");
+        };
+      }, [socket]);
+   
+  
+    const joinRoom = async(roomId)=>{
+      // Join the room via socket
+      socket.emit("joinRoom", { roomId });
+      console.log("Joined Room");
+      
+      // console.log(`${socketId} joinded room ${roomId}`);
+  
+    };
   const handleSignup = async (e) => {
     e?.preventDefault();
     setLoading(true);
@@ -34,11 +77,16 @@ export function SignupCard() {
         email,
         password,
       });
+      const createdRoomId = crypto.randomUUID();
+    
       if (res?.data?.success) {
         const token = res.data.data?.token;
         const user = res.data.data?.user;
         if (token) signin(token, user);
-        navigate("/home");
+        await joinRoom(createdRoomId)
+        setRoomId(createdRoomId)
+        
+        navigate(`/e/${createdRoomId}`);
       } else {
         setError(res?.data?.message || "Signup failed");
       }

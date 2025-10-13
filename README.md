@@ -1,5 +1,8 @@
 # Collaborative IDE Platform
 
+Notion Link: https://www.notion.so/Multi-user-IDE-26be870d6d9b80b0aadbc1b8d67fc468?source=copy_link
+
+
 ## Overview
 This project is a full-stack collaborative IDE platform designed for real-time code editing, execution, and team collaboration. It leverages modern web technologies, containerized code execution, and scalable event streaming for a robust developer experience.
 
