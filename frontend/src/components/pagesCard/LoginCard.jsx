@@ -78,6 +78,8 @@ export function LoginCard() {
         const user = res.data.data?.user;
         if (token) signin(token, user);
         await joinRoom(createdRoomId)
+        localStorage.setItem("roomId", createdRoomId);
+
         setRoomId(createdRoomId)
         
         navigate(`/e/${createdRoomId}`);
@@ -105,6 +107,8 @@ export function LoginCard() {
         
         await joinRoom(roomId);
         setRoomId(roomId)
+        localStorage.setItem("roomId", roomId);
+
         
         navigate(`/e/${roomId}`);
       } else {

@@ -33,13 +33,30 @@ const initSocket = (httpServer) => {
 
       // 👋 also notify this user that join was successful
       io.to(socket.id).emit("joinedRoom", { roomId });
+      
     });
-    
 
-    // Example: broadcast message
-    socket.on("sendMessage", ({ roomId, message }) => {
-      io.to(roomId).emit("receiveMessage", { sender: socket.id, message });
+    
+    socket.on("fileChange", (fileId , roomId) => {
+      console.log(`File changed: ${fileId} by ${socket.id}, to room: ${roomId}`);
+      // Broadcast to all other clients in the same room
+      io.to(roomId).emit("fileChanged", { fileId, editorId: socket.id });
     });
+
+    socket.on("setFileActive", (fileId , roomId) => {
+      console.log(`File active: ${fileId} by ${socket.id}, to room: ${roomId}`);  
+      // Broadcast to all other clients in the same room
+      io.to(roomId).emit("fileSetActive", { fileId, editorId: socket.id });
+    });
+
+    socket.on("closeFile", (fileId , roomId) => {
+      console.log(`File closed: ${fileId} by ${socket.id}, to room: ${roomId}`);
+      // Broadcast to all other clients in the same room
+      io.to(roomId).emit("fileClosed", { fileId, editorId: socket.id });
+    });
+
+   
+ 
 
     socket.on("disconnect", () => {
       console.log(`🔴 Client disconnected: ${socket.id}`);

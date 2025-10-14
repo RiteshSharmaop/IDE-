@@ -6,22 +6,24 @@ import { runTheCode } from '../lib/codeExecute';
 import { useAuth } from '../lib/auth';
 import { useSocket } from '../context/SocketContext';
 import { useNavigate } from 'react-router-dom';
+import { useRoom } from '../context/RoomContext';
 
 const CodeIDE = () => {
- const [theme, setTheme] = useState('dark');
+  const [theme, setTheme] = useState('dark');
   const [files, setFiles] = useState([
-    { 
-      id: 1, 
-      name: 'main.js', 
-      content: '// Write your JavaScript code here\nconsole.log("Hello World");', language: 'javascript', folder: 'src' },
+    {
+      id: 1,
+      name: 'main.js',
+      content: '// Write your JavaScript code here\nconsole.log("Hello World");', language: 'javascript', folder: 'src'
+    },
     { id: 2, name: 'app.py', content: '# Write your Python code here\nprint("Hello World")', language: 'python', folder: 'src' },
-    { 
-  id: 3, 
-  name: 'main.cpp', 
-  content: '#include <iostream>\nusing namespace std;\n\nint main() {\n    // Print Hello World\n    cout << "Hello, World!" << endl;\n    return 0;\n}\n', 
-  language: 'cpp', 
-  folder: 'dsa' 
-},
+    {
+      id: 3,
+      name: 'main.cpp',
+      content: '#include <iostream>\nusing namespace std;\n\nint main() {\n    // Print Hello World\n    cout << "Hello, World!" << endl;\n    return 0;\n}\n',
+      language: 'cpp',
+      folder: 'dsa'
+    },
   ]);
   const [activeFile, setActiveFile] = useState(files[0]);
   const [openFiles, setOpenFiles] = useState([files[0]]);
@@ -50,7 +52,7 @@ const CodeIDE = () => {
   //   plan: 'Free'
   // };
   const { user, signout } = useAuth();
-  
+
   // Sophisticated Color Palette
   const colors = {
     dark: {
@@ -98,45 +100,120 @@ const CodeIDE = () => {
     return langColors[lang] || c.textMuted;
   };
 
-  
-  const {socket , socketId} = useSocket();
-  
+
+  const { socket, socketId } = useSocket();
+
+  const { roomId, setRoomId } = useRoom();
+
+
   useEffect(() => {
-      if(!socket.id ){
-          navigate("/");
-      }
-      console.log("IDE SocketID : " , socketId);
-      return () => socket.off("receiveMessage");
+    if (!socket.id) {
+      navigate("/");
+    }
+    console.log("IDE SocketID : ", socketId);
+    return () => socket.off("receiveMessage");
   }, [socket, socketId]);
 
-   useEffect(() => {
-      if (!socket) return;
+  //  useEffect(() => {
+  //     if (!socket) return;
 
-      socket.on("joinedRoom", ({ roomId }) => {
-        console.log(`✅ Joined room ${roomId}`);
+  //     socket.on("joinedRoom", ({ roomId }) => {
+  //       console.log(`✅ Joined room ${roomId}`);
+  //     });
+
+  //     socket.on("someoneJoined", ({ socketId }) => {
+  //       console.log(`👋 Someone joined the room: ${socketId}`);
+  //     });
+  //     socket.on("fileChanged" , ({file})=>{
+  //       setActiveFile(file)
+  //     })
+
+  //     return () => {
+  //       socket.off("joinedRoom");
+  //       socket.off("someoneJoined");
+  //     };
+  //   }, [socket]);
+
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const savedRoomId = localStorage.getItem("roomId");
+
+    // If socket is connected but page refreshed, rejoin the room
+    if (savedRoomId && socket.connected) {
+      socket.emit("joinRoom", { roomId: savedRoomId, username: user.username });
+      setRoomId(savedRoomId);
+      console.log("♻️ Rejoined existing room:", savedRoomId);
+    }
+
+    // If socket reconnects (for example, after refresh)
+    socket.on("connect", () => {
+      const rejoinId = localStorage.getItem("roomId");
+      if (rejoinId) {
+        socket.emit("joinRoom", { roomId: rejoinId, username: user.username });
+        setRoomId(rejoinId);
+        console.log("🔁 Rejoined room after reconnect:", rejoinId);
+      }
+    });
+
+    socket.on("joinedRoom", ({ roomId }) => {
+      console.log(`✅ Joined room ${roomId}`);
+    });
+
+    socket.on("someoneJoined", ({ socketId }) => {
+      console.log(`👋 Someone joined the room: ${socketId}`);
+    });
+
+    socket.on("fileSetActive", ({ fileId }) => {
+      setActiveFile(files[fileId - 1])
+      // console.log("doping active : " ,fileId );
+
+    });
+
+    socket.on("fileClosed", handleFileClosed);
+
+    socket.on("fileChanged", handleFileChanged);
+
+
+    return () => {
+      socket.off("joinedRoom");
+      socket.off("someoneJoined");
+      socket.off("fileChanged");
+      socket.off("connect");
+    };
+  }, [socket]);
+
+  const handleFileClosed = ({ fileId }) => {
+    console.log("File closed by another user:", fileId);
+    setOpenFiles(prevFiles => {
+      const newFiles = prevFiles.filter(f => f.id !== fileId);
+
+      // If the active file was closed, switch to the last open file or null
+      setActiveFile(prevActive => {
+        if (prevActive?.id === fileId) {
+          return newFiles.length > 0 ? newFiles[newFiles.length - 1] : null;
+        }
+        return prevActive;
       });
 
-      socket.on("someoneJoined", ({ socketId }) => {
-        console.log(`👋 Someone joined the room: ${socketId}`);
-      });
+      return newFiles;
+    });
+  };
 
-      return () => {
-        socket.off("joinedRoom");
-        socket.off("someoneJoined");
-      };
-    }, [socket]);
-    
-    
-  //   useEffect(() => {
-  //       if (!socket.connected) {
-  //           socket.on("connect", () => {
-  //               setSocketId(socket.id);
-  //               console.log("Socket connected with ID:", socket.id);
-  //           });
-  //       } else {
-  //           setSocketId(socket.id);
-  //       }
-  //   }, []);
+  const handleFileChanged = ({ fileId, editorId }) => {
+    const changedFile = files.find((f) => f.id === fileId);
+    if (!changedFile) return;
+
+    setActiveFile(changedFile);
+
+    setOpenFiles((prev) => {
+      if (prev.some((f) => f.id === fileId)) return prev;
+      return [...prev, changedFile];
+    });
+  };
+
+
 
   const getLanguageFromExtension = (filename) => {
     const ext = filename.split('.').pop().toLowerCase();
@@ -165,6 +242,7 @@ const CodeIDE = () => {
       // Ensure the folder is expanded
       setExpandedFolders(prev => ({ ...prev, [selectedFolder]: true }));
     }
+
   };
 
   const handleCreateFolder = () => {
@@ -179,34 +257,34 @@ const CodeIDE = () => {
   };
 
   const handleFileClick = (file) => {
-    setActiveFile(file);
-    if (!openFiles.find(f => f.id === file.id)) {
-      setOpenFiles([...openFiles, file]);
-    }
+    socket.emit("fileChange", file.id, roomId);
   };
 
   const handleCloseFile = (fileId, e) => {
     e?.stopPropagation();
-    const newOpenFiles = openFiles.filter(f => f.id !== fileId);
-    setOpenFiles(newOpenFiles);
-    if (activeFile?.id === fileId) {
-      setActiveFile(newOpenFiles.length > 0 ? newOpenFiles[newOpenFiles.length - 1] : null);
-    }
+    socket.emit("closeFile", fileId, roomId)
   };
-   const handleEditorChange = (value) => {
+
+
+  const handleFileTabs = (file) => {
+    setActiveFile(file)
+    socket.emit("setFileActive", file.id, roomId);
+  }
+
+  const handleEditorChange = (value) => {
     const updatedFile = { ...activeFile, content: value };
     setActiveFile(updatedFile);
     setFiles(files.map(f => f.id === activeFile.id ? updatedFile : f));
     setOpenFiles(openFiles.map(f => f.id === activeFile.id ? updatedFile : f));
   };
 
-  const handleRunCode = async() => {
+  const handleRunCode = async () => {
     if (!activeFile) return;
     setOutputContent(`Running ${activeFile.name}...`);
     console.log(activeFile);
-    
+
     const input = terminalInputValue;
-    const res = await runTheCode(activeFile.language, activeFile.content , input)
+    const res = await runTheCode(activeFile.language, activeFile.content, input)
     setOutputContent(`${res.output}`);
     setErrorContent('');
     setTerminalTab('output');
@@ -238,19 +316,19 @@ const CodeIDE = () => {
     return acc;
   }, {});
 
-  useEffect(()=>{
+  useEffect(() => {
     console.log(user);
-    
-    
-  },[])
+
+
+  }, [])
 
   return (
     <div className="flex h-screen w-full" style={{ backgroundColor: c.bg, color: c.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      
+
       {/* Sidebar */}
-      <aside 
+      <aside
         className="flex flex-col border-r transition-all duration-300"
-        style={{ 
+        style={{
           width: sidebarCollapsed ? '60px' : '280px',
           backgroundColor: c.sidebar,
           borderColor: c.border
@@ -333,8 +411,8 @@ const CodeIDE = () => {
                             color: activeFile?.id === file.id ? c.accent : c.text
                           }}
                         >
-                          <div 
-                            className="w-2 h-2 rounded-full" 
+                          <div
+                            className="w-2 h-2 rounded-full"
                             style={{ backgroundColor: getLanguageColor(file.language) }}
                           />
                           <span className="text-sm truncate">{file.name}</span>
@@ -362,8 +440,8 @@ const CodeIDE = () => {
                   }}
                   title={file.name}
                 >
-                  <div 
-                    className="w-3 h-3 rounded-full" 
+                  <div
+                    className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: getLanguageColor(file.language) }}
                   />
                 </button>
@@ -381,9 +459,9 @@ const CodeIDE = () => {
                 className="w-full flex items-center gap-3 p-3 transition-all hover:opacity-90"
                 style={{ backgroundColor: userMenuOpen ? c.bgTertiary : 'transparent' }}
               >
-                <div 
+                <div
                   className="flex items-center justify-center h-8 w-8 rounded-full font-semibold text-sm"
-                  style={{ 
+                  style={{
                     background: 'linear-gradient(135deg, #B0C4DE 0%, #8A9AAA 100%)',
                     color: theme === 'dark' ? c.bg : '#FFFFFF'
                   }}
@@ -394,32 +472,32 @@ const CodeIDE = () => {
                   <span className="font-medium text-sm" style={{ color: c.text }}>{user.username}</span>
                   <span className="text-xs" style={{ color: c.textDim }}>{user.email}</span>
                 </div>
-                <ChevronDown 
-                  className="h-4 w-4 transition-transform" 
-                  style={{ 
+                <ChevronDown
+                  className="h-4 w-4 transition-transform"
+                  style={{
                     color: c.textMuted,
                     transform: userMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)'
-                  }} 
+                  }}
                 />
               </button>
 
               {/* User Dropdown Menu */}
               {userMenuOpen && (
                 <>
-                  <div 
-                    className="fixed inset-0 z-30" 
+                  <div
+                    className="fixed inset-0 z-30"
                     onClick={() => setUserMenuOpen(false)}
                   />
-                  <div 
+                  <div
                     className="absolute bottom-full left-0 right-0 mb-2 mx-2 rounded-lg border shadow-2xl z-40 overflow-hidden"
                     style={{ backgroundColor: c.bg, borderColor: c.border }}
                   >
                     {/* User Info Header */}
                     <div className="p-4 border-b" style={{ borderColor: c.border }}>
                       <div className="flex items-center gap-3">
-                        <div 
+                        <div
                           className="flex items-center justify-center h-12 w-12 rounded-full font-bold"
-                          style={{ 
+                          style={{
                             background: 'linear-gradient(135deg, #B0C4DE 0%, #8A9AAA 100%)',
                             color: theme === 'dark' ? c.bg : '#FFFFFF'
                           }}
@@ -437,7 +515,7 @@ const CodeIDE = () => {
                     {/* Upgrade Option */}
                     <button
                       className="w-full flex items-center gap-3 p-3 transition-all"
-                      style={{ 
+                      style={{
                         backgroundColor: 'transparent',
                         color: c.text
                       }}
@@ -448,9 +526,9 @@ const CodeIDE = () => {
                         e.currentTarget.style.backgroundColor = 'transparent';
                       }}
                     >
-                      <div 
+                      <div
                         className="flex h-9 w-9 items-center justify-center rounded-lg"
-                        style={{ 
+                        style={{
                           background: 'linear-gradient(135deg, #B0C4DE 0%, #8A9AAA 100%)'
                         }}
                       >
@@ -467,7 +545,7 @@ const CodeIDE = () => {
                     {/* Menu Items */}
                     <button
                       className="w-full flex items-center gap-3 px-4 py-2.5 transition-all"
-                      style={{ 
+                      style={{
                         backgroundColor: 'transparent',
                         color: c.text
                       }}
@@ -484,7 +562,7 @@ const CodeIDE = () => {
 
                     <button
                       className="w-full flex items-center gap-3 px-4 py-2.5 transition-all"
-                      style={{ 
+                      style={{
                         backgroundColor: 'transparent',
                         color: c.text
                       }}
@@ -501,7 +579,7 @@ const CodeIDE = () => {
 
                     <button
                       className="w-full flex items-center gap-3 px-4 py-2.5 transition-all"
-                      style={{ 
+                      style={{
                         backgroundColor: 'transparent',
                         color: c.text
                       }}
@@ -521,7 +599,7 @@ const CodeIDE = () => {
                     {/* Logout */}
                     <button
                       className="w-full flex items-center gap-3 px-4 py-2.5 transition-all"
-                      style={{ 
+                      style={{
                         backgroundColor: 'transparent',
                         color: c.error
                       }}
@@ -546,17 +624,17 @@ const CodeIDE = () => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        
+
         {/* Top Bar */}
-        <header 
+        <header
           className="flex items-center justify-between px-6 py-3 border-b"
           style={{ backgroundColor: c.bgSecondary, borderColor: c.border }}
         >
           <div className="flex items-center gap-4">
             {activeFile && (
               <div className="flex items-center gap-2">
-                <div 
-                  className="w-3 h-3 rounded-full" 
+                <div
+                  className="w-3 h-3 rounded-full"
                   style={{ backgroundColor: getLanguageColor(activeFile.language) }}
                 />
                 <span className="font-medium">{activeFile.name}</span>
@@ -597,14 +675,14 @@ const CodeIDE = () => {
 
         {/* File Tabs */}
         {openFiles.length > 0 && (
-          <div 
+          <div
             className="flex items-center gap-1 px-4 py-2 overflow-x-auto border-b"
             style={{ backgroundColor: c.bgSecondary, borderColor: c.border }}
           >
             {openFiles.map(file => (
               <button
                 key={file.id}
-                onClick={() => setActiveFile(file)}
+                onClick={() => handleFileTabs(file)}
                 className="flex items-center gap-2 px-4 py-2 rounded-t-lg transition-all relative group"
                 style={{
                   backgroundColor: activeFile?.id === file.id ? c.bg : 'transparent',
@@ -612,8 +690,8 @@ const CodeIDE = () => {
                   borderBottom: activeFile?.id === file.id ? `2px solid ${c.accent}` : 'none'
                 }}
               >
-                <div 
-                  className="w-2 h-2 rounded-full" 
+                <div
+                  className="w-2 h-2 rounded-full"
                   style={{ backgroundColor: getLanguageColor(file.language) }}
                 />
                 <span className="text-sm">{file.name}</span>
@@ -629,7 +707,7 @@ const CodeIDE = () => {
         )}
 
         {/* Editor Area */}
-        <div 
+        <div
           className="flex-1 overflow-hidden"
           style={{ backgroundColor: c.bg }}
         >
@@ -667,9 +745,9 @@ const CodeIDE = () => {
 
         {/* Terminal Panel */}
         {terminalVisible && (
-          <div 
+          <div
             className="border-t flex flex-col"
-            style={{ 
+            style={{
               height: '280px',
               backgroundColor: c.bgSecondary,
               borderColor: c.border
@@ -730,7 +808,7 @@ const CodeIDE = () => {
                   value={terminalInputValue}
                   onChange={(e) => setTerminalInputValue(e.target.value)}
                   className="w-full h-full p-3 rounded-lg border focus:outline-none resize-none"
-                  style={{ 
+                  style={{
                     backgroundColor: c.bgSecondary,
                     borderColor: c.border,
                     color: c.text
@@ -757,17 +835,17 @@ const CodeIDE = () => {
       {/* Create File Modal */}
       {isCreatingFile && (
         <>
-          <div 
+          <div
             className="fixed inset-0 bg-black bg-opacity-50 z-40"
             onClick={() => setIsCreatingFile(false)}
           />
-          <div 
+          <div
             className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 p-6 rounded-xl shadow-2xl z-50"
             style={{ backgroundColor: c.bg, width: '400px', borderColor: c.border, border: `1px solid ${c.border}` }}
           >
             <h3 className="text-lg font-semibold mb-4" style={{ color: c.text }}>Create New File</h3>
-            
-              <div className="mb-4">
+
+            <div className="mb-4">
               <label className="block text-sm font-medium mb-2" style={{ color: c.textMuted }}>
                 Select Folder
               </label>
@@ -825,16 +903,16 @@ const CodeIDE = () => {
       {/* Create Folder Modal */}
       {isCreatingFolder && (
         <>
-          <div 
+          <div
             className="fixed inset-0 bg-black bg-opacity-50 z-40"
             onClick={() => setIsCreatingFolder(false)}
           />
-          <div 
+          <div
             className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 p-6 rounded-xl shadow-2xl z-50"
             style={{ backgroundColor: c.bg, width: '400px', borderColor: c.border, border: `1px solid ${c.border}` }}
           >
             <h3 className="text-lg font-semibold mb-4" style={{ color: c.text }}>Create New Folder</h3>
-            
+
             <div className="mb-4">
               <label className="block text-sm font-medium mb-2" style={{ color: c.textMuted }}>
                 Folder Name
