@@ -1,51 +1,46 @@
 // src/config/redis.js
 const redis = require('redis');
 
-let redisClient = null;
 
-/**
- * Connect to Redis
- */
+
+let redisClient;
+// connect to redis server
 const connectRedis = async () => {
   try {
     redisClient = redis.createClient({
       socket: {
         host: process.env.REDIS_HOST || 'localhost',
-        port: process.env.REDIS_PORT || 6379,
+        port: process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT) : 6379,
       },
       password: process.env.REDIS_PASSWORD || undefined,
-      legacyMode: false,
+      username: process.env.REDIS_USERNAME || undefined,
     });
 
-    redisClient.on('error', (err) => {
-      console.error('❌ Redis Client Error:', err);
-    });
+    // Event listeners
+    redisClient.on('error', (err) => console.error('❌ Redis Client Error:', err));
+    redisClient.on('connect', () => console.log('🔗 Connecting to Redis...'));
+    redisClient.on('ready', () => console.log('✅ Redis connected successfully'));
+    redisClient.on('end', () => console.log('🔌 Redis connection closed'));
 
-    redisClient.on('connect', () => {
-      console.log('🔗 Connecting to Redis...');
-    });
-
-    redisClient.on('ready', async() => {
-      console.log('✅ Redis connected successfully');
-    });
-
-    redisClient.on('end', () => {
-      console.log('🔌 Redis connection closed');
-    });
-
+    // Connect to Redis
     await redisClient.connect();
-    await redisClient.set("ritesh" , "sharma" , 10);
-    console.log("Value set in redis for testing : " , await redisClient.get("ritesh"));
 
-    // Test the connection
-    await redisClient.ping();
-    
+    // Test setting and getting a value
+    await redisClient.set("ritesh", "sharma", { EX: 10 }); // EX sets expiry in seconds
+    const value = await redisClient.get("ritesh");
+    console.log("Value set in Redis for testing:", value);
+
+    // Test ping
+    const pong = await redisClient.ping();
+    console.log("Ping response from Redis:", pong);
+
     return redisClient;
   } catch (error) {
     console.error('❌ Redis connection failed:', error.message);
     throw error;
   }
 };
+
 
 /**
  * Get Redis client instance
@@ -357,5 +352,6 @@ module.exports = {
   blacklistToken,
   isTokenBlacklisted,
   clearAllCache,
-  getCacheStats
+  getCacheStats,
+  redisClient
 };

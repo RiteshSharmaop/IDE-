@@ -62,7 +62,7 @@ const initSocket = (httpServer) => {
 
   
   io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.id}`);
+    //console.log(`User connected: ${socket.id}`);
 
     // User joins a room
     socket.on('joinRoom', ({ roomId, username }) => {
@@ -71,8 +71,8 @@ const initSocket = (httpServer) => {
 
       const room = getOrCreateRoom(roomId);
 
-      console.log(`${username} joined room ${roomId}`);
-      console.log(`Total users in room: ${room.users.length}`);
+      //console.log(`${username} joined room ${roomId}`);
+      //console.log(`Total users in room: ${room.users.length}`);
 
       // Send room data to the joining user
       socket.emit('joinedRoom', {
@@ -93,7 +93,7 @@ const initSocket = (httpServer) => {
     
     // Create File
     socket.on('createFile', ({ file, roomId, username }) => {
-      console.log(`File created: ${file.name} by ${username} in room ${roomId}`);
+      //console.log(`File created: ${file.name} by ${username} in room ${roomId}`);
 
       const room = getOrCreateRoom(roomId);
 
@@ -109,12 +109,12 @@ const initSocket = (httpServer) => {
         timestamp: new Date()
       });
 
-      console.log(`Total files in room ${roomId}: ${room.files.length}`);
+      //console.log(`Total files in room ${roomId}: ${room.files.length}`);
     });
 
     // Delete File
     socket.on('deleteFile', ({ fileId, roomId, username }) => {
-      console.log(`File deleted: ${fileId} by ${username} in room ${roomId}`);
+      //console.log(`File deleted: ${fileId} by ${username} in room ${roomId}`);
 
       const room = getOrCreateRoom(roomId);
       room.files = room.files.filter(f => f.id !== fileId);
@@ -172,7 +172,7 @@ const initSocket = (httpServer) => {
 
     
     socket.on('createFolder', ({ folderName, roomId, username }) => {
-      console.log(`Folder created: ${folderName} by ${username} in room ${roomId}`);
+      //console.log(`Folder created: ${folderName} by ${username} in room ${roomId}`);
 
       const room = getOrCreateRoom(roomId);
 
@@ -186,12 +186,12 @@ const initSocket = (httpServer) => {
         timestamp: new Date()
       });
 
-      console.log(`Total folders in room ${roomId}: ${room.folders.length}`);
+      //console.log(`Total folders in room ${roomId}: ${room.folders.length}`);
     });
 
     
     socket.on('executeCode', ({ fileName, fileId, language, output, error, roomId, username }) => {
-      console.log(`Code executed: ${fileName} (${language}) by ${username} in room ${roomId}`);
+      //console.log(`Code executed: ${fileName} (${language}) by ${username} in room ${roomId}`);
 
       // Broadcast execution to all users in room (including sender)
       io.to(roomId).emit('codeExecuted', {
@@ -229,7 +229,7 @@ const initSocket = (httpServer) => {
 
     // Real-time code change synchronization
     socket.on("codeChange", ({ fileId, content, roomId, cursorPosition }) => {
-      console.log(`Code change in file ${fileId} by ${socket.username}`);
+      //console.log(`Code change in file ${fileId} by ${socket.username}`);
       
       // Broadcast to all other users in the room
       socket.to(roomId).emit("codeChanged", {
@@ -244,7 +244,7 @@ const initSocket = (httpServer) => {
    
     // Handle user disconnect
     socket.on('disconnect', () => {
-      console.log(`User disconnected: ${socket.id}`);
+      //console.log(`User disconnected: ${socket.id}`);
 
       // Remove user from all rooms they were in
       rooms.forEach((room, roomId) => {
@@ -259,7 +259,7 @@ const initSocket = (httpServer) => {
             totalUsers: room.users.length
           });
 
-          console.log(`${user.username} removed from room ${roomId}`);
+          //console.log(`${user.username} removed from room ${roomId}`);
         }
       });
     });
@@ -270,7 +270,7 @@ const initSocket = (httpServer) => {
     });
   });
 
-  console.log("⚡ Socket.IO initialized");
+  //console.log("⚡ Socket.IO initialized");
   return io;
 };
 

@@ -15,7 +15,7 @@ const CodeIDE = () => {
     {
       id: 1,
       name: 'main.js',
-      content: '// Write your JavaScript code here\nconsole.log("Hello World");', language: 'javascript', folder: 'src'
+      content: '// Write your JavaScript code here\n//console.log("Hello World");', language: 'javascript', folder: 'src'
     },
     { id: 2, name: 'app.py', content: '# Write your Python code here\nprint("Hello World")', language: 'python', folder: 'src' },
     {
@@ -54,10 +54,10 @@ const CodeIDE = () => {
   // };
   const { user, signout } = useAuth();
 
-  // 🔥 NEW: Track if the change is from remote user to prevent echo
+  //  Track if the change is from remote user to prevent echo
   const isRemoteChange = useRef(false);
   
-  // 🔥 NEW: Debounce timer for code changes
+  // Debounce timer for code changes
   const debounceTimer = useRef(null);
 
   // Sophisticated Color Palette
@@ -117,7 +117,7 @@ const CodeIDE = () => {
     if (!socket.id) {
       navigate("/");
     }
-    console.log("IDE SocketID : ", socketId);
+    //console.log("IDE SocketID : ", socketId);
     return () => socket.off("receiveMessage");
   }, [socket, socketId]);
 
@@ -132,7 +132,7 @@ const CodeIDE = () => {
     if (savedRoomId && socket.connected) {
       socket.emit("joinRoom", { roomId: savedRoomId, username: user.username });
       setRoomId(savedRoomId);
-      console.log("♻️ Rejoined existing room:", savedRoomId);
+      //console.log("♻️ Rejoined existing room:", savedRoomId);
     }
 
     // If socket reconnects (for example, after refresh)
@@ -141,21 +141,21 @@ const CodeIDE = () => {
       if (rejoinId) {
         socket.emit("joinRoom", { roomId: rejoinId, username: user.username });
         setRoomId(rejoinId);
-        console.log("🔁 Rejoined room after reconnect:", rejoinId);
+        //console.log("🔁 Rejoined room after reconnect:", rejoinId);
       }
     });
 
     socket.on("joinedRoom", ({ roomId }) => {
-      console.log(`✅ Joined room ${roomId}`);
+      //console.log(`✅ Joined room ${roomId}`);
     });
 
     socket.on("someoneJoined", ({ socketId }) => {
-      console.log(`👋 Someone joined the room: ${socketId}`);
+      //console.log(`👋 Someone joined the room: ${socketId}`);
     });
 
     socket.on("fileSetActive", ({ fileId }) => {
       setActiveFile(files[fileId - 1])
-      // console.log("doping active : " ,fileId );
+      // //console.log("doping active : " ,fileId );
 
     });
 
@@ -167,7 +167,7 @@ const CodeIDE = () => {
 
     // Listen for file creation from other users
     socket.on("fileCreated", ({ file }) => {
-      console.log("📄 File created by another user:", file);
+      //console.log("📄 File created by another user:", file);
       setFiles((prev) => {
         if (prev.some((f) => f.id === file.id)) return prev;
         return [...prev, file];
@@ -183,7 +183,7 @@ const CodeIDE = () => {
 
     // Listen for folder creation from other users
     socket.on("folderCreated", ({ folderName }) => {
-      console.log("📁 Folder created by another user:", folderName);
+      //console.log("📁 Folder created by another user:", folderName);
       setFolders((prev) => {
         if (prev.includes(folderName)) return prev;
         return [...prev, folderName];
@@ -196,7 +196,7 @@ const CodeIDE = () => {
     
     // Listen for file deletion
     socket.on("fileDeleted", ({ fileId }) => {
-      console.log("🗑️ File deleted by another user:", fileId);
+      //console.log("🗑️ File deleted by another user:", fileId);
       setFiles((prev) => prev.filter((f) => f.id !== fileId));
       setOpenFiles((prev) => prev.filter((f) => f.id !== fileId));
       if (activeFile?.id === fileId) {
@@ -206,7 +206,7 @@ const CodeIDE = () => {
 
     // Listen for code execution from other users
     socket.on("codeExecuted", ({ fileName, output, error }) => {
-      console.log("▶️ Code executed by another user:", fileName);
+      //console.log("▶️ Code executed by another user:", fileName);
       setOutputContent(output);
       if (error) {
         setErrorContent(error);
@@ -217,7 +217,7 @@ const CodeIDE = () => {
 
     // 🔥🔥🔥 REAL-TIME CODE SYNCHRONIZATION EVENT 🔥🔥🔥
     socket.on("codeChanged", ({ fileId, content, username, socketId: remoteSocketId }) => {
-      console.log(`📝 Code changed in file ${fileId} by ${username}`);
+      //console.log(`📝 Code changed in file ${fileId} by ${username}`);
       
       // Set flag to prevent echo (don't emit this change back)
       isRemoteChange.current = true;
@@ -251,7 +251,7 @@ const CodeIDE = () => {
     });
 
     socket.on("userLeft", ({ username }) => {
-      console.log(`👋 ${username} left the room`);
+      //console.log(`👋 ${username} left the room`);
     });
 
     return () => {
@@ -268,7 +268,7 @@ const CodeIDE = () => {
 
 
   const handleFileClosed = ({ fileId }) => {
-    console.log("File closed by another user:", fileId);
+    //console.log("File closed by another user:", fileId);
     setOpenFiles(prevFiles => {
       const newFiles = prevFiles.filter(f => f.id !== fileId);
 
@@ -385,7 +385,7 @@ const CodeIDE = () => {
   const handleEditorChange = (value) => {
     // Don't emit if this change came from a remote user
     if (isRemoteChange.current) {
-      console.log("⏭️ Skipping emit - change from remote user");
+      //console.log("⏭️ Skipping emit - change from remote user");
       return;
     }
 
@@ -401,7 +401,7 @@ const CodeIDE = () => {
     }
 
     debounceTimer.current = setTimeout(() => {
-      console.log("📤 Emitting code change to room");
+      //console.log("📤 Emitting code change to room");
       // Emit code change to other users in the room
       socket.emit("codeChange", {
         fileId: activeFile.id,
@@ -481,7 +481,7 @@ const handleRunCode = async () => {
   if (!activeFile) return;
 
   setOutputContent(`Running ${activeFile.name}...`);
-  console.log("Running:", activeFile);
+  //console.log("Running:", activeFile);
 
   try {
     const input = terminalInputValue;
@@ -555,11 +555,11 @@ const handleDeleteFile = (fileId) => {
   // };
 
 
-  // Remove the console.log line from handleCreateFile entirely
+  // Remove the //console.log line from handleCreateFile entirely
   // Instead, use this useEffect to verify files were added:
   useEffect(() => {
-    console.log("✅ Files state updated:", files);
-    console.log("📊 Total files:", files.length);
+    //console.log("✅ Files state updated:", files);
+    //console.log("📊 Total files:", files.length);
   }, [files]);
 
 
@@ -593,7 +593,7 @@ const handleDeleteFile = (fileId) => {
   // const handleRunCode = async () => {
   //   if (!activeFile) return;
   //   setOutputContent(`Running ${activeFile.name}...`);
-  //   console.log(activeFile);
+  //   //console.log(activeFile);
 
   //   const input = terminalInputValue;
   //   const res = await runTheCode(activeFile.language, activeFile.content, input)
@@ -629,7 +629,7 @@ const handleDeleteFile = (fileId) => {
   }, {});
 
   useEffect(() => {
-    console.log(user);
+    //console.log(user);
 
 
   }, [])
