@@ -1,13 +1,40 @@
-import React, { useState } from 'react';
+
+import React, { useEffect, useState, useRef } from 'react';
 import { Play, Plus, FileCode, Moon, Sun, Terminal, X, Menu, Save, Users, Share2, Clock, Folder, Search, Settings, Code2, Layers, ChevronRight, ChevronDown, User, LogOut, Bell, CreditCard, Zap } from 'lucide-react';
+
+import { MonacoEditor } from '../components/Editor/MonacoEditor';
+import { runTheCode } from '../lib/codeExecute';
+import { useAuth } from '../lib/auth';
+import { useSocket } from '../context/SocketContext';
+import { useNavigate } from 'react-router-dom';
+import { useRoom } from '../context/RoomContext';
 
 const CodeIDE = () => {
   const [theme, setTheme] = useState('dark');
   const [files, setFiles] = useState([
-    { id: 1, name: 'main.js', content: '// Write your JavaScript code here\nconsole.log("Hello World");', language: 'javascript', folder: 'src' },
-    { id: 2, name: 'app.py', content: '# Write your Python code here\nprint("Hello World")', language: 'python', folder: 'src' },
-    { id: 3, name: 'styles.css', content: '/* Add your styles */\nbody { margin: 0; }', language: 'css', folder: 'assets' },
+    {
+      id: 1,
+      name: 'main.js',
+      content: '// Write your JavaScript code here\nconsole.log("Hello World");', 
+      language: 'javascript', 
+      folder: 'src'
+    },
+    { 
+      id: 2, 
+      name: 'app.py', 
+      content: '# Write your Python code here\nprint("Hello World")', 
+      language: 'python', 
+      folder: 'src' 
+    },
+    {
+      id: 3,
+      name: 'main.cpp',
+      content: '#include <iostream>\nusing namespace std;\n\nint main() {\n    // Print Hello World\n    cout << "Hello, World!" << endl;\n    return 0;\n}\n',
+      language: 'cpp',
+      folder: 'dsa'
+    },
   ]);
+  
   const [activeFile, setActiveFile] = useState(files[0]);
   const [openFiles, setOpenFiles] = useState([files[0]]);
   const [isCreatingFile, setIsCreatingFile] = useState(false);
@@ -23,17 +50,20 @@ const CodeIDE = () => {
   const [terminalInputValue, setTerminalInputValue] = useState('');
   const [terminalVisible, setTerminalVisible] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [expandedFolders, setExpandedFolders] = useState({ src: true, assets: true });
-  const [folders, setFolders] = useState(['src', 'assets']); // Track all folders
+  const [expandedFolders, setExpandedFolders] = useState({ src: true, dsa: true });
+  const [folders, setFolders] = useState(['src', 'dsa']);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-
-  // Mock user data
-  const user = {
-    username: 'JohnDoe',
-    email: 'john.doe@example.com',
-    avatar: '',
-    plan: 'Free'
-  };
+  
+  const navigate = useNavigate();
+  const { user, signout } = useAuth();
+  const { socket, socketId } = useSocket();
+  const { roomId, setRoomId } = useRoom();
+  
+  // 🔥 NEW: Track if the change is from remote user to prevent echo
+  const isRemoteChange = useRef(false);
+  
+  // 🔥 NEW: Debounce timer for code changes
+  const debounceTimer = useRef(null);
 
   // Sophisticated Color Palette
   const colors = {
@@ -77,9 +107,345 @@ const CodeIDE = () => {
       python: theme === 'dark' ? '#3776AB' : '#2D5F8D',
       css: theme === 'dark' ? '#264DE4' : '#1B3BA3',
       html: theme === 'dark' ? '#E34C26' : '#C73B1D',
+      cpp: theme === 'dark' ? '#00599C' : '#004482',
       plaintext: c.textMuted
     };
     return langColors[lang] || c.textMuted;
+  };
+
+  // Socket connection check
+  useEffect(() => {
+    if (!socket.id) {
+      navigate("/");
+    }
+    console.log("IDE SocketID : ", socketId);
+    return () => socket.off("receiveMessage");
+  }, [socket, socketId]);
+
+  // 🔥 MAIN SOCKET EVENT LISTENERS WITH REAL-TIME CODE SYNC
+  useEffect(() => {
+    if (!socket) return;
+
+    const savedRoomId = localStorage.getItem("roomId");
+
+    // Rejoin room on page load
+    if (savedRoomId && socket.connected) {
+      socket.emit("joinRoom", { roomId: savedRoomId, username: user.username });
+      setRoomId(savedRoomId);
+      console.log("♻️ Rejoined existing room:", savedRoomId);
+    }
+
+    // Rejoin on reconnect
+    socket.on("connect", () => {
+      const rejoinId = localStorage.getItem("roomId");
+      if (rejoinId) {
+        socket.emit("joinRoom", { roomId: rejoinId, username: user.username });
+        setRoomId(rejoinId);
+        console.log("🔄 Rejoined room after reconnect:", rejoinId);
+      }
+    });
+
+    socket.on("joinedRoom", ({ roomId }) => {
+      console.log(`✅ Joined room ${roomId}`);
+    });
+
+    socket.on("someoneJoined", ({ socketId, username }) => {
+      console.log(`👋 ${username} joined the room`);
+    });
+
+    socket.on("fileSetActive", ({ fileId }) => {
+      const file = files.find(f => f.id === fileId);
+      if (file) {
+        setActiveFile(file);
+      }
+    });
+
+    socket.on("fileClosed", handleFileClosed);
+
+    // 🔥🔥🔥 REAL-TIME CODE SYNCHRONIZATION EVENT 🔥🔥🔥
+    socket.on("codeChanged", ({ fileId, content, username, socketId: remoteSocketId }) => {
+      console.log(`📝 Code changed in file ${fileId} by ${username}`);
+      
+      // Set flag to prevent echo (don't emit this change back)
+      isRemoteChange.current = true;
+      
+      // Update the file content in files array
+      setFiles(prevFiles => 
+        prevFiles.map(f => 
+          f.id === fileId ? { ...f, content } : f
+        )
+      );
+      
+      // Update open files
+      setOpenFiles(prevOpen => 
+        prevOpen.map(f => 
+          f.id === fileId ? { ...f, content } : f
+        )
+      );
+      
+      // Update active file if it's the one being edited
+      setActiveFile(prevActive => {
+        if (prevActive?.id === fileId) {
+          return { ...prevActive, content };
+        }
+        return prevActive;
+      });
+      
+      // Reset flag after update completes
+      setTimeout(() => {
+        isRemoteChange.current = false;
+      }, 100);
+    });
+
+    socket.on("fileCreated", ({ file, username }) => {
+      console.log(`📄 File created by ${username}:`, file);
+      setFiles((prev) => {
+        if (prev.some((f) => f.id === file.id)) return prev;
+        return [...prev, file];
+      });
+      setActiveFile(file);
+      setOpenFiles((prev) => {
+        if (prev.some((f) => f.id === file.id)) {
+          return prev;
+        }
+        return [...prev, file];
+      });
+    });
+
+    socket.on("folderCreated", ({ folderName, username }) => {
+      console.log(`📁 Folder created by ${username}:`, folderName);
+      setFolders((prev) => {
+        if (prev.includes(folderName)) return prev;
+        return [...prev, folderName];
+      });
+      setExpandedFolders((prev) => ({
+        ...prev,
+        [folderName]: true,
+      }));
+    });
+
+    socket.on("codeExecuted", ({ fileName, output, error, username }) => {
+      console.log(`▶️ Code executed by ${username}:`, fileName);
+      setOutputContent(output);
+      if (error) {
+        setErrorContent(error);
+      }
+      setTerminalTab("output");
+      setTerminalVisible(true);
+    });
+
+    socket.on("fileDeleted", ({ fileId, username }) => {
+      console.log(`🗑️ File deleted by ${username}:`, fileId);
+      setFiles((prev) => prev.filter((f) => f.id !== fileId));
+      setOpenFiles((prev) => prev.filter((f) => f.id !== fileId));
+      if (activeFile?.id === fileId) {
+        setActiveFile(null);
+      }
+    });
+
+    socket.on("userLeft", ({ username }) => {
+      console.log(`👋 ${username} left the room`);
+    });
+
+    return () => {
+      socket.off("joinedRoom");
+      socket.off("someoneJoined");
+      socket.off("fileSetActive");
+      socket.off("fileClosed");
+      socket.off("codeChanged");
+      socket.off("connect");
+      socket.off("fileCreated");
+      socket.off("folderCreated");
+      socket.off("codeExecuted");
+      socket.off("fileDeleted");
+      socket.off("userLeft");
+    };
+  }, [socket, files, activeFile, user.username, roomId]);
+
+  const handleFileClosed = ({ fileId }) => {
+    console.log("File closed by another user:", fileId);
+    setOpenFiles(prevFiles => {
+      const newFiles = prevFiles.filter(f => f.id !== fileId);
+      setActiveFile(prevActive => {
+        if (prevActive?.id === fileId) {
+          return newFiles.length > 0 ? newFiles[newFiles.length - 1] : null;
+        }
+        return prevActive;
+      });
+      return newFiles;
+    });
+  };
+
+  // 🔥🔥🔥 REAL-TIME CODE CHANGE HANDLER 🔥🔥🔥
+  const handleEditorChange = (value) => {
+    // Don't emit if this change came from a remote user
+    if (isRemoteChange.current) {
+      console.log("⏭️ Skipping emit - change from remote user");
+      return;
+    }
+
+    // Update local state immediately
+    const updatedFile = { ...activeFile, content: value };
+    setActiveFile(updatedFile);
+    setFiles(files.map(f => f.id === activeFile.id ? updatedFile : f));
+    setOpenFiles(openFiles.map(f => f.id === activeFile.id ? updatedFile : f));
+
+    // Debounce socket emission to avoid too many events
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+
+    debounceTimer.current = setTimeout(() => {
+      console.log("📤 Emitting code change to room");
+      // Emit code change to other users in the room
+      socket.emit("codeChange", {
+        fileId: activeFile.id,
+        content: value,
+        roomId: roomId
+      });
+    }, 300); // 300ms debounce - adjust as needed
+  };
+
+  const handleFileClick = (file) => {
+    socket.emit("fileChange", file.id, roomId);
+    setActiveFile(file);
+    setOpenFiles((prev) => {
+      if (prev.some((f) => f.id === file.id)) {
+        return prev;
+      }
+      return [...prev, file];
+    });
+  };
+
+  useEffect(() => {
+    // Remove any duplicate files from openFiles
+    setOpenFiles((prev) => {
+      const seen = new Set();
+      const unique = prev.filter((file) => {
+        if (seen.has(file.id)) {
+          console.warn('Duplicate file detected and removed:', file.id);
+          return false;
+        }
+        seen.add(file.id);
+        return true;
+      });
+      return unique.length === prev.length ? prev : unique;
+    });
+  }, [files]);
+
+  const handleCreateFile = () => {
+    if (newFileName.trim()) {
+      const newFile = {
+        id: Date.now(),
+        name: newFileName,
+        content: '',
+        language: getLanguageFromExtension(newFileName),
+        folder: selectedFolder
+      };
+
+      setFiles((prevFiles) => {
+        const alreadyExists = prevFiles.some(
+          (f) => f.name === newFileName && f.folder === selectedFolder
+        );
+        
+        if (alreadyExists) {
+          console.warn('File already exists:', newFileName);
+          return prevFiles;
+        }
+        
+        return [...prevFiles, newFile];
+      });
+
+      setOpenFiles((prev) => {
+        if (prev.some((f) => f.id === newFile.id)) {
+          return prev;
+        }
+        return [...prev, newFile];
+      });
+
+      setActiveFile(newFile);
+      setExpandedFolders((prev) => ({
+        ...prev,
+        [selectedFolder]: true,
+      }));
+
+      // Emit file creation to other users
+      socket.emit("createFile", {
+        file: newFile,
+        roomId: roomId,
+        username: user.username
+      });
+
+      setNewFileName('');
+      setIsCreatingFile(false);
+    }
+  };
+
+  const handleCreateFolder = () => {
+    if (newFolderName.trim() && !folders.includes(newFolderName)) {
+      setFolders(prev => [...prev, newFolderName]);
+      setExpandedFolders(prev => ({ ...prev, [newFolderName]: true }));
+
+      // Emit folder creation to other users
+      socket.emit("createFolder", {
+        folderName: newFolderName,
+        roomId: roomId,
+        username: user.username
+      });
+
+      setNewFolderName('');
+      setIsCreatingFolder(false);
+    }
+  };
+
+  const handleRunCode = async () => {
+    if (!activeFile) return;
+
+    setOutputContent(`Running ${activeFile.name}...`);
+    console.log("Running:", activeFile);
+
+    try {
+      const input = terminalInputValue;
+      const res = await runTheCode(activeFile.language, activeFile.content, input);
+      
+      setOutputContent(`${res.output}`);
+      setErrorContent('');
+      setTerminalTab('output');
+      setTerminalVisible(true);
+
+      // Emit code execution to other users
+      socket.emit("executeCode", {
+        fileName: activeFile.name,
+        fileId: activeFile.id,
+        language: activeFile.language,
+        output: res.output,
+        error: res.error || '',
+        roomId: roomId,
+        username: user.username
+      });
+
+    } catch (error) {
+      console.error("Error running code:", error);
+      setErrorContent(`Error: ${error.message}`);
+      setTerminalTab('error');
+      setTerminalVisible(true);
+    }
+  };
+
+  const handleDeleteFile = (fileId) => {
+    setFiles((prev) => prev.filter((f) => f.id !== fileId));
+    setOpenFiles((prev) => prev.filter((f) => f.id !== fileId));
+    
+    if (activeFile?.id === fileId) {
+      setActiveFile(null);
+    }
+
+    // Emit file deletion to other users
+    socket.emit("deleteFile", {
+      fileId: fileId,
+      roomId: roomId,
+      username: user.username
+    });
   };
 
   const getLanguageFromExtension = (filename) => {
@@ -92,58 +458,35 @@ const CodeIDE = () => {
     return langMap[ext] || 'plaintext';
   };
 
-  const handleCreateFile = () => {
-    if (newFileName.trim()) {
-      const newFile = {
-        id: Date.now(),
-        name: newFileName,
-        content: '',
-        language: getLanguageFromExtension(newFileName),
-        folder: selectedFolder
-      };
-      setFiles([...files, newFile]);
-      setNewFileName('');
-      setIsCreatingFile(false);
-      setActiveFile(newFile);
-      setOpenFiles([...openFiles, newFile]);
-      // Ensure the folder is expanded
-      setExpandedFolders(prev => ({ ...prev, [selectedFolder]: true }));
-    }
-  };
+  useEffect(() => {
+    console.log("✅ Files state updated:", files);
+    console.log("📊 Total files:", files.length);
+  }, [files]);
 
-  const handleCreateFolder = () => {
-    if (newFolderName.trim() && !folders.includes(newFolderName)) {
-      // Add the folder to the folders list
-      setFolders(prev => [...prev, newFolderName]);
-      // Add the folder to expandedFolders
-      setExpandedFolders(prev => ({ ...prev, [newFolderName]: true }));
-      setNewFolderName('');
-      setIsCreatingFolder(false);
+  useEffect(() => {
+    if (activeFile && !files.find(f => f.id === activeFile.id)) {
+      setActiveFile(null);
     }
-  };
-
-  const handleFileClick = (file) => {
-    setActiveFile(file);
-    if (!openFiles.find(f => f.id === file.id)) {
-      setOpenFiles([...openFiles, file]);
-    }
-  };
+  }, [files]);
 
   const handleCloseFile = (fileId, e) => {
     e?.stopPropagation();
-    const newOpenFiles = openFiles.filter(f => f.id !== fileId);
-    setOpenFiles(newOpenFiles);
-    if (activeFile?.id === fileId) {
-      setActiveFile(newOpenFiles.length > 0 ? newOpenFiles[newOpenFiles.length - 1] : null);
-    }
+    setOpenFiles(prevFiles => {
+      const newFiles = prevFiles.filter(f => f.id !== fileId);
+      setActiveFile(prevActive => {
+        if (prevActive?.id === fileId) {
+          return newFiles.length > 0 ? newFiles[newFiles.length - 1] : null;
+        }
+        return prevActive;
+      });
+      return newFiles;
+    });
+    socket.emit("closeFile", fileId, roomId);
   };
 
-  const handleRunCode = () => {
-    if (!activeFile) return;
-    setOutputContent(`Running ${activeFile.name}...\n${activeFile.content}\n\n[Execution completed]`);
-    setErrorContent('');
-    setTerminalTab('output');
-    setTerminalVisible(true);
+  const handleFileTabs = (file) => {
+    setActiveFile(file);
+    socket.emit("setFileActive", file.id, roomId);
   };
 
   const handleTerminalCommand = (e) => {
@@ -165,19 +508,22 @@ const CodeIDE = () => {
     setExpandedFolders(prev => ({ ...prev, [folder]: !prev[folder] }));
   };
 
-  // Group files by folder and ensure all folders are shown
   const groupedFiles = folders.reduce((acc, folder) => {
     acc[folder] = files.filter(file => file.folder === folder);
     return acc;
   }, {});
 
+  useEffect(() => {
+    console.log(user);
+  }, []);
+
   return (
     <div className="flex h-screen w-full" style={{ backgroundColor: c.bg, color: c.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      
+
       {/* Sidebar */}
-      <aside 
+      <aside
         className="flex flex-col border-r transition-all duration-300"
-        style={{ 
+        style={{
           width: sidebarCollapsed ? '60px' : '280px',
           backgroundColor: c.sidebar,
           borderColor: c.border
@@ -188,7 +534,7 @@ const CodeIDE = () => {
           {!sidebarCollapsed && (
             <div className="flex items-center gap-2">
               <Code2 size={24} style={{ color: c.accent }} />
-              <span className="font-bold text-lg">CodeIDE</span>
+              <span className="font-bold text-lg">HexaHub</span>
             </div>
           )}
           <button
@@ -206,7 +552,7 @@ const CodeIDE = () => {
             <button
               onClick={() => {
                 setIsCreatingFile(true);
-                setSelectedFolder('src'); // Default folder
+                setSelectedFolder('src');
               }}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:opacity-90"
               style={{ backgroundColor: c.accent, color: theme === 'dark' ? c.bg : '#FFFFFF' }}
@@ -260,8 +606,8 @@ const CodeIDE = () => {
                             color: activeFile?.id === file.id ? c.accent : c.text
                           }}
                         >
-                          <div 
-                            className="w-2 h-2 rounded-full" 
+                          <div
+                            className="w-2 h-2 rounded-full"
                             style={{ backgroundColor: getLanguageColor(file.language) }}
                           />
                           <span className="text-sm truncate">{file.name}</span>
@@ -289,8 +635,8 @@ const CodeIDE = () => {
                   }}
                   title={file.name}
                 >
-                  <div 
-                    className="w-3 h-3 rounded-full" 
+                  <div
+                    className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: getLanguageColor(file.language) }}
                   />
                 </button>
@@ -308,9 +654,9 @@ const CodeIDE = () => {
                 className="w-full flex items-center gap-3 p-3 transition-all hover:opacity-90"
                 style={{ backgroundColor: userMenuOpen ? c.bgTertiary : 'transparent' }}
               >
-                <div 
+                <div
                   className="flex items-center justify-center h-8 w-8 rounded-full font-semibold text-sm"
-                  style={{ 
+                  style={{
                     background: 'linear-gradient(135deg, #B0C4DE 0%, #8A9AAA 100%)',
                     color: theme === 'dark' ? c.bg : '#FFFFFF'
                   }}
@@ -321,32 +667,31 @@ const CodeIDE = () => {
                   <span className="font-medium text-sm" style={{ color: c.text }}>{user.username}</span>
                   <span className="text-xs" style={{ color: c.textDim }}>{user.email}</span>
                 </div>
-                <ChevronDown 
-                  className="h-4 w-4 transition-transform" 
-                  style={{ 
+                <ChevronDown
+                  className="h-4 w-4 transition-transform"
+                  style={{
                     color: c.textMuted,
                     transform: userMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)'
-                  }} 
+                  }}
                 />
               </button>
 
               {/* User Dropdown Menu */}
               {userMenuOpen && (
                 <>
-                  <div 
-                    className="fixed inset-0 z-30" 
+                  <div
+                    className="fixed inset-0 z-30"
                     onClick={() => setUserMenuOpen(false)}
                   />
-                  <div 
+                  <div
                     className="absolute bottom-full left-0 right-0 mb-2 mx-2 rounded-lg border shadow-2xl z-40 overflow-hidden"
                     style={{ backgroundColor: c.bg, borderColor: c.border }}
                   >
-                    {/* User Info Header */}
                     <div className="p-4 border-b" style={{ borderColor: c.border }}>
                       <div className="flex items-center gap-3">
-                        <div 
+                        <div
                           className="flex items-center justify-center h-12 w-12 rounded-full font-bold"
-                          style={{ 
+                          style={{
                             background: 'linear-gradient(135deg, #B0C4DE 0%, #8A9AAA 100%)',
                             color: theme === 'dark' ? c.bg : '#FFFFFF'
                           }}
@@ -361,10 +706,9 @@ const CodeIDE = () => {
                       </div>
                     </div>
 
-                    {/* Upgrade Option */}
                     <button
                       className="w-full flex items-center gap-3 p-3 transition-all"
-                      style={{ 
+                      style={{
                         backgroundColor: 'transparent',
                         color: c.text
                       }}
@@ -375,9 +719,9 @@ const CodeIDE = () => {
                         e.currentTarget.style.backgroundColor = 'transparent';
                       }}
                     >
-                      <div 
+                      <div
                         className="flex h-9 w-9 items-center justify-center rounded-lg"
-                        style={{ 
+                        style={{
                           background: 'linear-gradient(135deg, #B0C4DE 0%, #8A9AAA 100%)'
                         }}
                       >
@@ -391,10 +735,9 @@ const CodeIDE = () => {
 
                     <div className="border-t" style={{ borderColor: c.border }} />
 
-                    {/* Menu Items */}
                     <button
                       className="w-full flex items-center gap-3 px-4 py-2.5 transition-all"
-                      style={{ 
+                      style={{
                         backgroundColor: 'transparent',
                         color: c.text
                       }}
@@ -411,7 +754,7 @@ const CodeIDE = () => {
 
                     <button
                       className="w-full flex items-center gap-3 px-4 py-2.5 transition-all"
-                      style={{ 
+                      style={{
                         backgroundColor: 'transparent',
                         color: c.text
                       }}
@@ -428,7 +771,7 @@ const CodeIDE = () => {
 
                     <button
                       className="w-full flex items-center gap-3 px-4 py-2.5 transition-all"
-                      style={{ 
+                      style={{
                         backgroundColor: 'transparent',
                         color: c.text
                       }}
@@ -445,10 +788,9 @@ const CodeIDE = () => {
 
                     <div className="border-t" style={{ borderColor: c.border }} />
 
-                    {/* Logout */}
                     <button
                       className="w-full flex items-center gap-3 px-4 py-2.5 transition-all"
-                      style={{ 
+                      style={{
                         backgroundColor: 'transparent',
                         color: c.error
                       }}
@@ -458,6 +800,7 @@ const CodeIDE = () => {
                       onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor = 'transparent';
                       }}
+                      onClick={signout}
                     >
                       <LogOut size={16} />
                       <span className="text-sm">Log out</span>
@@ -472,17 +815,17 @@ const CodeIDE = () => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        
+
         {/* Top Bar */}
-        <header 
+        <header
           className="flex items-center justify-between px-6 py-3 border-b"
           style={{ backgroundColor: c.bgSecondary, borderColor: c.border }}
         >
           <div className="flex items-center gap-4">
             {activeFile && (
               <div className="flex items-center gap-2">
-                <div 
-                  className="w-3 h-3 rounded-full" 
+                <div
+                  className="w-3 h-3 rounded-full"
                   style={{ backgroundColor: getLanguageColor(activeFile.language) }}
                 />
                 <span className="font-medium">{activeFile.name}</span>
@@ -523,14 +866,14 @@ const CodeIDE = () => {
 
         {/* File Tabs */}
         {openFiles.length > 0 && (
-          <div 
+          <div
             className="flex items-center gap-1 px-4 py-2 overflow-x-auto border-b"
             style={{ backgroundColor: c.bgSecondary, borderColor: c.border }}
           >
             {openFiles.map(file => (
               <button
                 key={file.id}
-                onClick={() => setActiveFile(file)}
+                onClick={() => handleFileTabs(file)}
                 className="flex items-center gap-2 px-4 py-2 rounded-t-lg transition-all relative group"
                 style={{
                   backgroundColor: activeFile?.id === file.id ? c.bg : 'transparent',
@@ -538,8 +881,8 @@ const CodeIDE = () => {
                   borderBottom: activeFile?.id === file.id ? `2px solid ${c.accent}` : 'none'
                 }}
               >
-                <div 
-                  className="w-2 h-2 rounded-full" 
+                <div
+                  className="w-2 h-2 rounded-full"
                   style={{ backgroundColor: getLanguageColor(file.language) }}
                 />
                 <span className="text-sm">{file.name}</span>
@@ -555,28 +898,18 @@ const CodeIDE = () => {
         )}
 
         {/* Editor Area */}
-        <div 
+        <div
           className="flex-1 overflow-hidden"
           style={{ backgroundColor: c.bg }}
         >
           {activeFile ? (
             <div className="h-full p-6">
-              <textarea
+              <MonacoEditor
+                key={activeFile.id}
                 value={activeFile.content}
-                onChange={(e) => {
-                  const updatedFile = { ...activeFile, content: e.target.value };
-                  setActiveFile(updatedFile);
-                  setFiles(files.map(f => f.id === activeFile.id ? updatedFile : f));
-                  setOpenFiles(openFiles.map(f => f.id === activeFile.id ? updatedFile : f));
-                }}
-                className="w-full h-full font-mono text-sm p-4 rounded-lg border focus:outline-none resize-none"
-                style={{
-                  backgroundColor: c.bgSecondary,
-                  color: c.text,
-                  borderColor: c.border,
-                  lineHeight: '1.6'
-                }}
-                placeholder="Start typing your code..."
+                onChange={handleEditorChange}
+                language={activeFile.language}
+                theme={theme}
               />
             </div>
           ) : (
@@ -603,9 +936,9 @@ const CodeIDE = () => {
 
         {/* Terminal Panel */}
         {terminalVisible && (
-          <div 
+          <div
             className="border-t flex flex-col"
-            style={{ 
+            style={{
               height: '280px',
               backgroundColor: c.bgSecondary,
               borderColor: c.border
@@ -666,7 +999,7 @@ const CodeIDE = () => {
                   value={terminalInputValue}
                   onChange={(e) => setTerminalInputValue(e.target.value)}
                   className="w-full h-full p-3 rounded-lg border focus:outline-none resize-none"
-                  style={{ 
+                  style={{
                     backgroundColor: c.bgSecondary,
                     borderColor: c.border,
                     color: c.text
@@ -693,17 +1026,17 @@ const CodeIDE = () => {
       {/* Create File Modal */}
       {isCreatingFile && (
         <>
-          <div 
+          <div
             className="fixed inset-0 bg-black bg-opacity-50 z-40"
             onClick={() => setIsCreatingFile(false)}
           />
-          <div 
+          <div
             className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 p-6 rounded-xl shadow-2xl z-50"
             style={{ backgroundColor: c.bg, width: '400px', borderColor: c.border, border: `1px solid ${c.border}` }}
           >
             <h3 className="text-lg font-semibold mb-4" style={{ color: c.text }}>Create New File</h3>
-            
-              <div className="mb-4">
+
+            <div className="mb-4">
               <label className="block text-sm font-medium mb-2" style={{ color: c.textMuted }}>
                 Select Folder
               </label>
@@ -761,16 +1094,16 @@ const CodeIDE = () => {
       {/* Create Folder Modal */}
       {isCreatingFolder && (
         <>
-          <div 
+          <div
             className="fixed inset-0 bg-black bg-opacity-50 z-40"
             onClick={() => setIsCreatingFolder(false)}
           />
-          <div 
+          <div
             className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 p-6 rounded-xl shadow-2xl z-50"
             style={{ backgroundColor: c.bg, width: '400px', borderColor: c.border, border: `1px solid ${c.border}` }}
           >
             <h3 className="text-lg font-semibold mb-4" style={{ color: c.text }}>Create New Folder</h3>
-            
+
             <div className="mb-4">
               <label className="block text-sm font-medium mb-2" style={{ color: c.textMuted }}>
                 Folder Name

@@ -7,6 +7,7 @@ import { useAuth } from '../lib/auth';
 import { useSocket } from '../context/SocketContext';
 import { useNavigate } from 'react-router-dom';
 import { useRoom } from '../context/RoomContext';
+import { useRef } from 'react';
 
 const CodeIDE = () => {
   const [theme, setTheme] = useState('dark');
@@ -52,6 +53,12 @@ const CodeIDE = () => {
   //   plan: 'Free'
   // };
   const { user, signout } = useAuth();
+
+  // 🔥 NEW: Track if the change is from remote user to prevent echo
+  const isRemoteChange = useRef(false);
+  
+  // 🔥 NEW: Debounce timer for code changes
+  const debounceTimer = useRef(null);
 
   // Sophisticated Color Palette
   const colors = {
@@ -114,26 +121,7 @@ const CodeIDE = () => {
     return () => socket.off("receiveMessage");
   }, [socket, socketId]);
 
-  //  useEffect(() => {
-  //     if (!socket) return;
-
-  //     socket.on("joinedRoom", ({ roomId }) => {
-  //       console.log(`✅ Joined room ${roomId}`);
-  //     });
-
-  //     socket.on("someoneJoined", ({ socketId }) => {
-  //       console.log(`👋 Someone joined the room: ${socketId}`);
-  //     });
-  //     socket.on("fileChanged" , ({file})=>{
-  //       setActiveFile(file)
-  //     })
-
-  //     return () => {
-  //       socket.off("joinedRoom");
-  //       socket.off("someoneJoined");
-  //     };
-  //   }, [socket]);
-
+ 
 
   useEffect(() => {
     if (!socket) return;
@@ -176,13 +164,108 @@ const CodeIDE = () => {
     socket.on("fileChanged", handleFileChanged);
 
 
+
+    // Listen for file creation from other users
+    socket.on("fileCreated", ({ file }) => {
+      console.log("📄 File created by another user:", file);
+      setFiles((prev) => {
+        if (prev.some((f) => f.id === file.id)) return prev;
+        return [...prev, file];
+      });
+      setActiveFile(file);
+      setOpenFiles((prev) => {
+      if (prev.some((f) => f.id === file.id)) {
+        return prev;
+      }
+      return [...prev, file];
+    });
+    });
+
+    // Listen for folder creation from other users
+    socket.on("folderCreated", ({ folderName }) => {
+      console.log("📁 Folder created by another user:", folderName);
+      setFolders((prev) => {
+        if (prev.includes(folderName)) return prev;
+        return [...prev, folderName];
+      });
+      setExpandedFolders((prev) => ({
+        ...prev,
+        [folderName]: true,
+      }));
+    });
+    
+    // Listen for file deletion
+    socket.on("fileDeleted", ({ fileId }) => {
+      console.log("🗑️ File deleted by another user:", fileId);
+      setFiles((prev) => prev.filter((f) => f.id !== fileId));
+      setOpenFiles((prev) => prev.filter((f) => f.id !== fileId));
+      if (activeFile?.id === fileId) {
+        setActiveFile(null);
+      }
+    });
+
+    // Listen for code execution from other users
+    socket.on("codeExecuted", ({ fileName, output, error }) => {
+      console.log("▶️ Code executed by another user:", fileName);
+      setOutputContent(output);
+      if (error) {
+        setErrorContent(error);
+      }
+      setTerminalTab("output");
+      setTerminalVisible(true);
+    });
+
+    // 🔥🔥🔥 REAL-TIME CODE SYNCHRONIZATION EVENT 🔥🔥🔥
+    socket.on("codeChanged", ({ fileId, content, username, socketId: remoteSocketId }) => {
+      console.log(`📝 Code changed in file ${fileId} by ${username}`);
+      
+      // Set flag to prevent echo (don't emit this change back)
+      isRemoteChange.current = true;
+      
+      // Update the file content in files array
+      setFiles(prevFiles => 
+        prevFiles.map(f => 
+          f.id === fileId ? { ...f, content } : f
+        )
+      );
+      
+      // Update open files
+      setOpenFiles(prevOpen => 
+        prevOpen.map(f => 
+          f.id === fileId ? { ...f, content } : f
+        )
+      );
+      
+      // Update active file if it's the one being edited
+      setActiveFile(prevActive => {
+        if (prevActive?.id === fileId) {
+          return { ...prevActive, content };
+        }
+        return prevActive;
+      });
+      
+      // Reset flag after update completes
+      setTimeout(() => {
+        isRemoteChange.current = false;
+      }, 100);
+    });
+
+    socket.on("userLeft", ({ username }) => {
+      console.log(`👋 ${username} left the room`);
+    });
+
     return () => {
       socket.off("joinedRoom");
       socket.off("someoneJoined");
       socket.off("fileChanged");
       socket.off("connect");
+      socket.off("fileCreated");
+      socket.off("folderCreated");
+      socket.off("codeExecuted");
+      socket.off("fileDeleted");
     };
   }, [socket]);
+
 
   const handleFileClosed = ({ fileId }) => {
     console.log("File closed by another user:", fileId);
@@ -201,20 +284,254 @@ const CodeIDE = () => {
     });
   };
 
+
   const handleFileChanged = ({ fileId, editorId }) => {
     const changedFile = files.find((f) => f.id === fileId);
+
     if (!changedFile) return;
 
     setActiveFile(changedFile);
 
+    // Only add to openFiles if not already there
     setOpenFiles((prev) => {
-      if (prev.some((f) => f.id === fileId)) return prev;
+      if (prev.some((f) => f.id === fileId)) {
+        return prev; // Already open, don't add again
+      }
       return [...prev, changedFile];
     });
   };
 
 
+  // const handleCreateFile = () => {
+  //   if (newFileName.trim()) {
+  //     const newFile = {
+  //       id: Date.now(),
+  //       name: newFileName,
+  //       content: '',
+  //       language: getLanguageFromExtension(newFileName),
+  //       folder: selectedFolder
+  //     };
 
+  //     setFiles((prevFiles) => {
+  //       // Check if file already exists
+  //       const alreadyExists = prevFiles.some(
+  //         (f) => f.name === newFileName && f.folder === selectedFolder
+  //       );
+
+  //       if (alreadyExists) {
+  //         console.warn('File already exists:', newFileName);
+  //         return prevFiles;
+  //       }
+
+  //       return [...prevFiles, newFile];
+  //     });
+
+  //     // Use a separate batch to update dependent state
+  //     setOpenFiles((prev) => {
+  //       // Double-check it's not already in openFiles
+  //       if (prev.some((f) => f.id === newFile.id)) {
+  //         return prev;
+  //       }
+  //       return [...prev, newFile];
+  //     });
+
+  //     setActiveFile(newFile);
+  //     setExpandedFolders((prev) => ({
+  //       ...prev,
+  //       [selectedFolder]: true,
+  //     }));
+
+  //     setNewFileName('');
+  //     setIsCreatingFile(false);
+  //   }
+  // };
+
+
+  const handleFileClick = (file) => {
+    // Emit socket event for real-time sync
+    socket.emit("fileChange", file.id, roomId);
+
+    // Immediately update local state
+    setActiveFile(file);
+
+    // Add to open files if not already there
+    setOpenFiles((prev) => {
+      if (prev.some((f) => f.id === file.id)) {
+        return prev;
+      }
+      return [...prev, file];
+    });
+  };
+
+
+  useEffect(() => {
+    // Remove any duplicate files from openFiles
+    setOpenFiles((prev) => {
+      const seen = new Set();
+      const unique = prev.filter((file) => {
+        if (seen.has(file.id)) {
+          console.warn('Duplicate file detected and removed:', file.id);
+          return false;
+        }
+        seen.add(file.id);
+        return true;
+      });
+      return unique.length === prev.length ? prev : unique;
+    });
+  }, [files]);
+
+  
+  // 🔥🔥🔥 REAL-TIME CODE CHANGE HANDLER 🔥🔥🔥
+  const handleEditorChange = (value) => {
+    // Don't emit if this change came from a remote user
+    if (isRemoteChange.current) {
+      console.log("⏭️ Skipping emit - change from remote user");
+      return;
+    }
+
+    // Update local state immediately
+    const updatedFile = { ...activeFile, content: value };
+    setActiveFile(updatedFile);
+    setFiles(files.map(f => f.id === activeFile.id ? updatedFile : f));
+    setOpenFiles(openFiles.map(f => f.id === activeFile.id ? updatedFile : f));
+
+    // Debounce socket emission to avoid too many events
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+
+    debounceTimer.current = setTimeout(() => {
+      console.log("📤 Emitting code change to room");
+      // Emit code change to other users in the room
+      socket.emit("codeChange", {
+        fileId: activeFile.id,
+        content: value,
+        roomId: roomId
+      });
+    }, 300); // 300ms debounce - adjust as needed
+  };
+
+  // .................................................................................
+const handleCreateFile = () => {
+  if (newFileName.trim()) {
+    const newFile = {
+      id: Date.now(),
+      name: newFileName,
+      content: '',
+      language: getLanguageFromExtension(newFileName),
+      folder: selectedFolder
+    };
+
+    setFiles((prevFiles) => {
+      const alreadyExists = prevFiles.some(
+        (f) => f.name === newFileName && f.folder === selectedFolder
+      );
+      
+      if (alreadyExists) {
+        console.warn('File already exists:', newFileName);
+        return prevFiles;
+      }
+      
+      return [...prevFiles, newFile];
+    });
+
+    setOpenFiles((prev) => {
+      if (prev.some((f) => f.id === newFile.id)) {
+        return prev;
+      }
+      return [...prev, newFile];
+    });
+
+    setActiveFile(newFile);
+    setExpandedFolders((prev) => ({
+      ...prev,
+      [selectedFolder]: true,
+    }));
+
+    // ✅ EMIT FILE CREATION EVENT TO OTHER USERS
+    socket.emit("createFile", {
+      file: newFile,
+      roomId: roomId,
+      username: user.username
+    });
+
+    setNewFileName('');
+    setIsCreatingFile(false);
+  }
+};
+
+const handleCreateFolder = () => {
+  if (newFolderName.trim() && !folders.includes(newFolderName)) {
+    setFolders(prev => [...prev, newFolderName]);
+    setExpandedFolders(prev => ({ ...prev, [newFolderName]: true }));
+
+    // ✅ EMIT FOLDER CREATION EVENT TO OTHER USERS
+    socket.emit("createFolder", {
+      folderName: newFolderName,
+      roomId: roomId,
+      username: user.username
+    });
+
+    setNewFolderName('');
+    setIsCreatingFolder(false);
+  }
+};
+
+const handleRunCode = async () => {
+  if (!activeFile) return;
+
+  setOutputContent(`Running ${activeFile.name}...`);
+  console.log("Running:", activeFile);
+
+  try {
+    const input = terminalInputValue;
+    const res = await runTheCode(activeFile.language, activeFile.content, input);
+    
+    setOutputContent(`${res.output}`);
+    setErrorContent('');
+    setTerminalTab('output');
+    setTerminalVisible(true);
+
+    // ✅ EMIT CODE EXECUTION EVENT TO OTHER USERS
+    socket.emit("executeCode", {
+      fileName: activeFile.name,
+      fileId: activeFile.id,
+      language: activeFile.language,
+      output: res.output,
+      error: res.error || '',
+      roomId: roomId,
+      username: user.username
+    });
+
+  } catch (error) {
+    console.error("Error running code:", error);
+    setErrorContent(`Error: ${error.message}`);
+    setTerminalTab('error');
+    setTerminalVisible(true);
+  }
+};
+
+// ============================================
+// OPTIONAL: ADD DELETE FILE HANDLER WITH SOCKET
+// ============================================
+
+const handleDeleteFile = (fileId) => {
+  setFiles((prev) => prev.filter((f) => f.id !== fileId));
+  setOpenFiles((prev) => prev.filter((f) => f.id !== fileId));
+  
+  if (activeFile?.id === fileId) {
+    setActiveFile(null);
+  }
+
+  // ✅ EMIT FILE DELETION EVENT TO OTHER USERS
+  socket.emit("deleteFile", {
+    fileId: fileId,
+    roomId: roomId,
+    username: user.username
+  });
+};
+
+  // .................................................................................
   const getLanguageFromExtension = (filename) => {
     const ext = filename.split('.').pop().toLowerCase();
     const langMap = {
@@ -225,40 +542,35 @@ const CodeIDE = () => {
     return langMap[ext] || 'plaintext';
   };
 
-  const handleCreateFile = () => {
-    if (newFileName.trim()) {
-      const newFile = {
-        id: Date.now(),
-        name: newFileName,
-        content: '',
-        language: getLanguageFromExtension(newFileName),
-        folder: selectedFolder
-      };
-      setFiles([...files, newFile]);
-      setNewFileName('');
-      setIsCreatingFile(false);
-      setActiveFile(newFile);
-      setOpenFiles([...openFiles, newFile]);
-      // Ensure the folder is expanded
-      setExpandedFolders(prev => ({ ...prev, [selectedFolder]: true }));
+
+  // const handleCreateFolder = () => {
+  //   if (newFolderName.trim() && !folders.includes(newFolderName)) {
+  //     // Add the folder to the folders list
+  //     setFolders(prev => [...prev, newFolderName]);
+  //     // Add the folder to expandedFolders
+  //     setExpandedFolders(prev => ({ ...prev, [newFolderName]: true }));
+  //     setNewFolderName('');
+  //     setIsCreatingFolder(false);
+  //   }
+  // };
+
+
+  // Remove the console.log line from handleCreateFile entirely
+  // Instead, use this useEffect to verify files were added:
+  useEffect(() => {
+    console.log("✅ Files state updated:", files);
+    console.log("📊 Total files:", files.length);
+  }, [files]);
+
+
+
+  // Optional: Add a useEffect to handle file creation side effects
+  useEffect(() => {
+    // This ensures the file is properly synced and displayed
+    if (activeFile && !files.find(f => f.id === activeFile.id)) {
+      setActiveFile(null);
     }
-
-  };
-
-  const handleCreateFolder = () => {
-    if (newFolderName.trim() && !folders.includes(newFolderName)) {
-      // Add the folder to the folders list
-      setFolders(prev => [...prev, newFolderName]);
-      // Add the folder to expandedFolders
-      setExpandedFolders(prev => ({ ...prev, [newFolderName]: true }));
-      setNewFolderName('');
-      setIsCreatingFolder(false);
-    }
-  };
-
-  const handleFileClick = (file) => {
-    socket.emit("fileChange", file.id, roomId);
-  };
+  }, [files]);
 
   const handleCloseFile = (fileId, e) => {
     e?.stopPropagation();
@@ -271,25 +583,25 @@ const CodeIDE = () => {
     socket.emit("setFileActive", file.id, roomId);
   }
 
-  const handleEditorChange = (value) => {
-    const updatedFile = { ...activeFile, content: value };
-    setActiveFile(updatedFile);
-    setFiles(files.map(f => f.id === activeFile.id ? updatedFile : f));
-    setOpenFiles(openFiles.map(f => f.id === activeFile.id ? updatedFile : f));
-  };
+  // const handleEditorChange = (value) => {
+  //   const updatedFile = { ...activeFile, content: value };
+  //   setActiveFile(updatedFile);
+  //   setFiles(files.map(f => f.id === activeFile.id ? updatedFile : f));
+  //   setOpenFiles(openFiles.map(f => f.id === activeFile.id ? updatedFile : f));
+  // };
 
-  const handleRunCode = async () => {
-    if (!activeFile) return;
-    setOutputContent(`Running ${activeFile.name}...`);
-    console.log(activeFile);
+  // const handleRunCode = async () => {
+  //   if (!activeFile) return;
+  //   setOutputContent(`Running ${activeFile.name}...`);
+  //   console.log(activeFile);
 
-    const input = terminalInputValue;
-    const res = await runTheCode(activeFile.language, activeFile.content, input)
-    setOutputContent(`${res.output}`);
-    setErrorContent('');
-    setTerminalTab('output');
-    setTerminalVisible(true);
-  };
+  //   const input = terminalInputValue;
+  //   const res = await runTheCode(activeFile.language, activeFile.content, input)
+  //   setOutputContent(`${res.output}`);
+  //   setErrorContent('');
+  //   setTerminalTab('output');
+  //   setTerminalVisible(true);
+  // };
 
   const handleTerminalCommand = (e) => {
     if (e.key === 'Enter') {
