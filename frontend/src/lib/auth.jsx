@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import api from "./api";
 import { useNavigate } from "react-router-dom";
+import { useRoom } from "../context/RoomContext";
 
 const AuthContext = createContext(null);
 
@@ -19,6 +20,7 @@ export function AuthProvider({ children }) {
   });
 
   const [loading, setLoading] = useState(true);
+  
 
   useEffect(() => {
     const init = async () => {
@@ -81,6 +83,7 @@ export function AuthProvider({ children }) {
     } catch {}
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    setRoomId("");
     setUser(null);
   };
 
