@@ -82,8 +82,7 @@ export function AuthProvider({ children }) {
       await api.post("/api/auth/logout");
     } catch {}
     localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    setRoomId("");
+    localStorage.removeItem("user");;
     setUser(null);
   };
 
