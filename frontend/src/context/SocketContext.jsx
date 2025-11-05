@@ -58,7 +58,9 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     // Initialize socket connection
-    const newSocket = io("http://localhost:8080", {
+    
+    const SOCKET_URL = import.meta.env.VITE_BACKEND_URL;
+    const newSocket = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: 10,
