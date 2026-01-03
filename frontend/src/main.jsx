@@ -10,14 +10,14 @@ import { SocketProvider } from "./context/SocketContext.jsx";
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
+      <RoomProvider>
       <AuthProvider>
         <SocketProvider>
-          <RoomProvider>
 
             <App />
-          </RoomProvider>
         </SocketProvider>
       </AuthProvider>
+      </RoomProvider>
     </BrowserRouter>
   </StrictMode>
 );

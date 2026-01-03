@@ -20,6 +20,8 @@ export function AuthProvider({ children }) {
   });
 
   const [loading, setLoading] = useState(true);
+
+  const {roomId , setRoomId} = useRoom();
   
 
   useEffect(() => {
@@ -80,6 +82,9 @@ export function AuthProvider({ children }) {
   const signout = async () => {
     try {
       await api.post("/api/auth/logout");
+      console.log("Logout Room : " , roomId);
+      setRoomId("");
+      
     } catch {}
     localStorage.removeItem("token");
     localStorage.removeItem("user");;
