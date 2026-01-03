@@ -60,6 +60,11 @@ const initSocket = (httpServer) => {
     }
   };
 
+  const getActiveUserCount = (roomId) => {
+    return activeUsers.has(roomId) ? activeUsers.get(roomId).size : 0;
+  };
+
+
   
   io.on('connection', (socket) => {
     //console.log(`User connected: ${socket.id}`);
@@ -224,6 +229,21 @@ const initSocket = (httpServer) => {
         users: room.users.map(u => ({ username: u.username, socketId: u.socketId })),
         executionHistory: room.executionHistory
       });
+    });
+
+    socket.on('getActiveUsers', (roomId) => {
+      const count = getActiveUserCount(roomId);
+      console.log("Loop :");
+
+      
+      io.to(roomId).emit("activeUserCount", {
+        roomId,
+        count
+      });
+
+      console.log("Count : " , count);
+      
+
     });
 
 

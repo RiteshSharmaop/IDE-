@@ -109,16 +109,17 @@ const signin = async (req, res) => {
         message: 'Please provide email and password'
       });
     }
-
+    
     // Find user (include password for comparison)
     const user = await User.findOne({ email }).select('+password');
-
+    
     if (!user) {
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
       });
     }
+    console.log("Worked");
 
     // Check if account is active
     if (!user.isActive) {

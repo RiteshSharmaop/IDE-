@@ -7,6 +7,7 @@ import StartingPage from "./pages/StartingPage";
 import { ProtectedRoute } from "./lib/auth";
 import IDE from "./pages/IDE";
 import IDE2 from "./pages/IDE2";
+import ShareDialog from "./components/ShareDialog";
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/share" element={<ShareDialog />} />
         <Route path="/not-found" element={<NotFound />} />
       </Routes>
     </>

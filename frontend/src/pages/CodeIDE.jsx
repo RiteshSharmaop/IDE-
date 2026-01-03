@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Play, Plus, FileCode, Moon, Copy,Check, Sun, Terminal, X, Menu, Save, Users, Share2, Clock, Folder, Search, Settings, Code2, Layers, ChevronRight, ChevronDown, User, LogOut, Bell, CreditCard, Zap } from 'lucide-react';
+import { Play, Plus, FileCode, Moon, Copy,Check, Sun, Terminal, X, Menu, Save, Users, Share2, Clock, Folder, Search, Settings, Code2, Layers, ChevronRight, ChevronDown, User, LogOut, Bell, CreditCard, Zap, Cloud, Brain } from 'lucide-react';
 
 import { MonacoEditor } from '../components/Editor/MonacoEditor';
 import { runTheCode } from '../lib/codeExecute';
 import { useAuth } from '../lib/auth';
 import { useSocket } from '../context/SocketContext';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useRoom } from '../context/RoomContext';
 import { useRef } from 'react';
 import AIAssistantSidebar from '../components/AiAssistantSidebar';
+import { Empty } from '../components/ui/empty';
+import ShareDialog from '../components/ShareDialog';
 
 const CodeIDE = () => {
   const [theme, setTheme] = useState('dark');
@@ -480,6 +482,13 @@ const handleCreateFolder = () => {
     setIsCreatingFolder(false);
   }
 };
+
+const handleShareButton = () => {
+  console.log("Empty called");
+  
+  setShareModalOpen(true);
+};
+
 
 const handleRunCode = async () => {
   if (!activeFile) return;
@@ -976,10 +985,20 @@ const handleDeleteFile = (fileId) => {
                 {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
               </button>
 
+              <Link
+                to="https://brainmash-1.onrender.com"
+                className="flex cursor-pointer items-center gap-2 px-4 py-2 rounded-lg transition-all hover:opacity-70 disabled:opacity-40 "
+                // style={{ backgroundColor: c.accent, color: theme === 'dark' ? c.bg : '#FFFFFF' }}
+                style={{  backgroundColor: c.bgTertiary }}
+              >
+                <Brain size={16} />
+                <span className="text-sm font-medium">BrainMesh</span>
+              </Link>
+
               <button
                 onClick={handleRunCode}
                 disabled={!activeFile}
-                className="flex cursor-pointer items-center gap-2 px-4 py-2 rounded-lg transition-all hover:opacity-90 disabled:opacity-40"
+                className="flex cursor-pointer items-center gap-2 px-4 py-2 rounded-lg transition-all hover:opacity-70 disabled:opacity-40"
                 style={{ backgroundColor: c.accent, color: theme === 'dark' ? c.bg : '#FFFFFF' }}
               >
                 <Play size={16} />
@@ -987,7 +1006,8 @@ const handleDeleteFile = (fileId) => {
               </button>
 
               <button
-                onClick={() => setShareModalOpen(true)}
+                // onClick={() => setShareModalOpen(true)}
+                onClick={handleShareButton}
                 className="p-2 rounded-lg transition-all hover:opacity-80"
                 style={{ backgroundColor: c.bgTertiary }}
               >
@@ -1277,7 +1297,7 @@ const handleDeleteFile = (fileId) => {
         )}
 
         {/* Share Modal */}
-        {shareModalOpen && (
+        {/* {shareModalOpen && (
           <>
             <div
               className="fixed inset-0 bg-[#fff4] bg-opacity-50 z-41"
@@ -1340,7 +1360,35 @@ const handleDeleteFile = (fileId) => {
               </div>
             </div>
           </>
-        )}
+        )} */}
+
+        {shareModalOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/40 z-40"
+            onClick={() => setShareModalOpen(false)}
+          />
+
+          <div
+            className="fixed top-1/2 left-1/2 z-50
+            -translate-x-1/2 -translate-y-1/2
+            p-6 rounded-xl shadow-2xl"
+            style={{
+              backgroundColor: c.bg,
+              color: c.text,
+              border: `1px solid ${c.border}`,
+              width: "550px"
+            }}
+          >
+            <ShareDialog
+              theme={theme}
+              colors={c}
+              onClose={() => setShareModalOpen(false)}
+            />
+          </div>
+        </>
+      )}
+
 
         
       </div>
