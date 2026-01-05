@@ -88,6 +88,7 @@ export function AuthProvider({ children }) {
     } catch {}
     localStorage.removeItem("token");
     localStorage.removeItem("user");;
+    localStorage.removeItem("roomId");;
     setUser(null);
   };
 

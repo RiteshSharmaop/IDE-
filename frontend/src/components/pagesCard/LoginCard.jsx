@@ -16,6 +16,7 @@ import api from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { useSocket } from "../../context/SocketContext";
 import { useRoom } from "../../context/RoomContext";
+import { Eye, EyeOff } from "lucide-react";
 
 export function LoginCard() {
   const [email, setEmail] = useState("");
@@ -24,46 +25,42 @@ export function LoginCard() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
   const { signin } = useAuth();
-  const {socket , socketId , setSocketId} = useSocket();
+  const { socket, socketId, setSocketId } = useSocket();
   const { roomId, setRoomId } = useRoom();
+  const [showPassword, setShowPassword] = useState(false);
 
-   useEffect(() => {
-    // connect to socket      
+  useEffect(() => {
+    // connect to socket
     if (!socket) return;
 
-  
-          console.log("SocketID : " , socketId);
-      
-  
-          return () => socket.off("receiveMessage");
-      }, [socket, socketId]);
-  
-    useEffect(() => {
-      if (!socket) return;
+    console.log("SocketID : ", socketId);
 
-      socket.on("joinedRoom", ({ roomId }) => {
-        console.log(`✅ Joined room ${roomId}`);
-      });
+    return () => socket.off("receiveMessage");
+  }, [socket, socketId]);
 
-      socket.on("someoneJoined", ({ socketId }) => {
-        console.log(`👋 Someone joined the room: ${socketId}`);
-      });
+  useEffect(() => {
+    if (!socket) return;
 
-      return () => {
-        socket.off("joinedRoom");
-        socket.off("someoneJoined");
-      };
-    }, [socket]);
- 
-    
+    socket.on("joinedRoom", ({ roomId }) => {
+      console.log(`✅ Joined room ${roomId}`);
+    });
 
-  const joinRoom = async(roomId)=>{
+    socket.on("someoneJoined", ({ socketId }) => {
+      console.log(`👋 Someone joined the room: ${socketId}`);
+    });
+
+    return () => {
+      socket.off("joinedRoom");
+      socket.off("someoneJoined");
+    };
+  }, [socket]);
+
+  const joinRoom = async (roomId) => {
     // Join the room via socket
     socket.emit("joinRoom", { roomId });
     console.log("Joined Room");
-    
-    // console.log(`${socketId} joinded room ${roomId}`);
 
+    // console.log(`${socketId} joinded room ${roomId}`);
   };
 
   const handleEnterKey = (e) => {
@@ -72,10 +69,7 @@ export function LoginCard() {
 
       // 👇 get live value from input
       const enteredRoomId =
-        e.target.id === "roomId"
-          ? e.target.value.trim()
-          : roomId?.trim();
-
+        e.target.id === "roomId" ? e.target.value.trim() : roomId?.trim();
 
       if (enteredRoomId) {
         handleLoginAndJoinRoom(e);
@@ -85,13 +79,12 @@ export function LoginCard() {
     }
   };
 
-
   const handleLogin = async (e) => {
     e?.preventDefault();
     setLoading(true);
     setError(null);
     const createdRoomId = crypto.randomUUID();
-    
+
     try {
       const res = await api.post("/api/auth/signin", { email, password });
       if (res?.data?.success) {
@@ -99,11 +92,11 @@ export function LoginCard() {
         console.log("roomID ", createdRoomId);
         const user = res.data.data?.user;
         if (token) signin(token, user);
-        await joinRoom(createdRoomId)
+        await joinRoom(createdRoomId);
         localStorage.setItem("roomId", createdRoomId);
 
-        setRoomId(createdRoomId)
-        
+        setRoomId(createdRoomId);
+
         navigate(`/e/${createdRoomId}`);
       } else {
         setError(res?.data?.message || "Login failed");
@@ -114,24 +107,23 @@ export function LoginCard() {
       setLoading(false);
     }
   };
-  
+
   const handleLoginAndJoinRoom = async (e) => {
     e?.preventDefault();
     setLoading(true);
     setError(null);
-    
+
     try {
       const res = await api.post("/api/auth/signin", { email, password });
       if (res?.data?.success) {
         const token = res.data.data?.token;
         const user = res.data.data?.user;
         if (token) signin(token, user);
-        
+
         await joinRoom(roomId);
-        setRoomId(roomId)
+        setRoomId(roomId);
         localStorage.setItem("roomId", roomId);
 
-        
         navigate(`/e/${roomId}`);
       } else {
         setError(res?.data?.message || "Login failed");
@@ -180,8 +172,6 @@ export function LoginCard() {
                 required
                 className="bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0] placeholder-[#3E3F3E] focus:ring-[#D0D0D0]"
               />
-            
-
             </div>
             <div className="grid gap-2">
               <div className="flex items-center">
@@ -196,16 +186,31 @@ export function LoginCard() {
                   Forgot your password?
                 </Link>
               </div>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="********"
-                onKeyDown={handleEnterKey}
-                required
-                className="bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0] placeholder-[#3E3F3E] focus:ring-[#D0D0D0]"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="********"
+                  onKeyDown={handleEnterKey}
+                  required
+                  autoComplete="current-password"
+                  className="bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0]
+               placeholder-[#3E3F3E] focus:ring-[#D0D0D0] pr-10"
+                />
+
+                <span
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2
+               cursor-pointer text-[#D0D0D0] hover:text-white
+               select-none"
+                  role="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </span>
+              </div>
             </div>
           </div>
         </form>

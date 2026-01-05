@@ -16,6 +16,7 @@ import api from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { useSocket } from "../../context/SocketContext";
 import { useRoom } from "../../context/RoomContext";
+import { Eye, EyeOff } from "lucide-react";
 
 export function SignupCard() {
   const [username, setUsername] = useState("");
@@ -26,47 +27,43 @@ export function SignupCard() {
   const navigate = useNavigate();
   const { signin } = useAuth();
 
+  const { socket, socketId, setSocketId } = useSocket();
+  const { roomId, setRoomId } = useRoom();
+  const [showPassword, setShowPassword] = useState(false);
 
-   const {socket , socketId , setSocketId} = useSocket();
-    const { roomId, setRoomId } = useRoom();
-  
-     useEffect(() => {
-      // connect to socket      
-      if (!socket) return;
-  
-    
-            console.log("SocketID : " , socketId);
-        
-    
-            return () => socket.off("receiveMessage");
-        }, [socket, socketId]);
-    
-      useEffect(() => {
-        if (!socket) return;
-  
-        socket.on("joinedRoom", ({ roomId }) => {
-          console.log(`✅ Joined room ${roomId}`);
-        });
-  
-        socket.on("someoneJoined", ({ socketId }) => {
-          console.log(`👋 Someone joined the room: ${socketId}`);
-        });
-  
-        return () => {
-          socket.off("joinedRoom");
-          socket.off("someoneJoined");
-        };
-      }, [socket]);
-   
-  
-    const joinRoom = async(roomId)=>{
-      // Join the room via socket
-      socket.emit("joinRoom", { roomId });
-      console.log("Joined Room");
-      
-      // console.log(`${socketId} joinded room ${roomId}`);
-  
+  useEffect(() => {
+    // connect to socket
+    if (!socket) return;
+
+    console.log("SocketID : ", socketId);
+
+    return () => socket.off("receiveMessage");
+  }, [socket, socketId]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on("joinedRoom", ({ roomId }) => {
+      console.log(`✅ Joined room ${roomId}`);
+    });
+
+    socket.on("someoneJoined", ({ socketId }) => {
+      console.log(`👋 Someone joined the room: ${socketId}`);
+    });
+
+    return () => {
+      socket.off("joinedRoom");
+      socket.off("someoneJoined");
     };
+  }, [socket]);
+
+  const joinRoom = async (roomId) => {
+    // Join the room via socket
+    socket.emit("joinRoom", { roomId });
+    console.log("Joined Room");
+
+    // console.log(`${socketId} joinded room ${roomId}`);
+  };
   const handleSignup = async (e) => {
     e?.preventDefault();
     setLoading(true);
@@ -78,14 +75,14 @@ export function SignupCard() {
         password,
       });
       const createdRoomId = crypto.randomUUID();
-    
+
       if (res?.data?.success) {
         const token = res.data.data?.token;
         const user = res.data.data?.user;
         if (token) signin(token, user);
-        await joinRoom(createdRoomId)
-        setRoomId(createdRoomId)
-        
+        await joinRoom(createdRoomId);
+        setRoomId(createdRoomId);
+
         navigate(`/e/${createdRoomId}`);
       } else {
         setError(res?.data?.message || "Signup failed");
@@ -147,7 +144,7 @@ export function SignupCard() {
               <Label htmlFor="password" className="text-[#D0D0D0]">
                 Password
               </Label>
-              <Input
+              {/* <Input
                 id="password"
                 type="password"
                 value={password}
@@ -155,7 +152,31 @@ export function SignupCard() {
                 placeholder="********"
                 required
                 className="bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0] placeholder-[#3E3F3E] focus:ring-[#D0D0D0]"
-              />
+              /> */}
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="********"
+                  autoComplete="new-password"
+
+                  className="bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0]
+               placeholder-[#3E3F3E] focus:ring-[#D0D0D0] pr-10"
+                />
+
+                <span
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2
+               cursor-pointer text-[#D0D0D0] hover:text-white
+               select-none"
+                  role="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </span>
+              </div>
             </div>
           </div>
         </form>
@@ -174,8 +195,8 @@ export function SignupCard() {
         <Button
           variant="outline"
           className="w-full cursor-pointer border border-[#3E3F3E] bg-[#3e3f3eaf] hover:bg-[#6260608e] text-white hover:text-white"
-          onClick={()=>{
-            navigate("/not-found")
+          onClick={() => {
+            navigate("/not-found");
           }}
         >
           Sign Up with Google
