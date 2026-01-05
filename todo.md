@@ -32,3 +32,7 @@
 - user can change the code and ev
 
 # add Live user in side bar
+
+# Add notification
+
+https://ui.shadcn.com/create?item=checkbox-example

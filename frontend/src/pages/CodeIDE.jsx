@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Play, Plus, FileCode, Moon, Copy,Check, Sun, Terminal, X, Menu, Save, Users, Share2, Clock, Folder, Search, Settings, Code2, Layers, ChevronRight, ChevronDown, User, LogOut, Bell, CreditCard, Zap, Cloud, Brain } from 'lucide-react';
+import { Play, Plus, FileCode, Moon, Copy,Check, Sun, Terminal, X, Menu, Save, Users, Share2, Clock, Folder, Search, Settings, Code2, Layers, ChevronRight, ChevronDown, User, LogOut, Bell, CreditCard, Zap, Cloud, Brain, Trash2 } from 'lucide-react';
 
 import { MonacoEditor } from '../components/Editor/MonacoEditor';
 import { runTheCode } from '../lib/codeExecute';
@@ -11,6 +11,7 @@ import { useRef } from 'react';
 import AIAssistantSidebar from '../components/AiAssistantSidebar';
 import { Empty } from '../components/ui/empty';
 import ShareDialog from '../components/ShareDialog';
+import CheckboxInTable from '../components/CheckboxInTable';
 
 const CodeIDE = () => {
   const [theme, setTheme] = useState('dark');
@@ -49,6 +50,8 @@ const CodeIDE = () => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false); 
   const [copySuccess, setCopySuccess] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [notifications, setNotifications] = useState([]);
 
   const navigate = useNavigate()
   // Mock user data
@@ -99,6 +102,18 @@ const CodeIDE = () => {
       activeTab: '#E8E8E8',
     }
   };
+
+  const addNotification = (notification) => {
+    setNotifications((prev) => [
+      {
+        id: Date.now() + Math.random(),
+        timestamp: new Date().toLocaleTimeString(),
+        ...notification,
+      },
+      ...prev,
+    ]);
+  };
+
 
   const c = colors[theme];
 
@@ -154,10 +169,17 @@ const CodeIDE = () => {
     socket.on("joinedRoom", ({ roomId }) => {
       //console.log(`✅ Joined room ${roomId}`);
     });
-
-    socket.on("someoneJoined", ({ socketId }) => {
-      //console.log(`👋 Someone joined the room: ${socketId}`);
+    
+    socket.on("someoneJoined", ({ username }) => {
+      console.log(`✅ SomeJoined room ${username}`);
+      addNotification({
+        type: "USER_JOINED",
+        title: "User Joined",
+        username,
+        status: "Active",
+      });
     });
+
 
     socket.on("fileSetActive", ({ fileId }) => {
       setActiveFile(files[fileId - 1])
@@ -180,11 +202,18 @@ const CodeIDE = () => {
       });
       setActiveFile(file);
       setOpenFiles((prev) => {
-      if (prev.some((f) => f.id === file.id)) {
-        return prev;
-      }
-      return [...prev, file];
-    });
+        if (prev.some((f) => f.id === file.id)) {
+          return prev;
+        }
+        return [...prev, file];
+      });
+      addNotification({
+        type: "FILE_CREATED",
+        title: `File Created: ${file.name}`,
+        username: "Someone",
+        status: "Active",
+      });
+
     });
 
     // Listen for folder creation from other users
@@ -198,6 +227,13 @@ const CodeIDE = () => {
         ...prev,
         [folderName]: true,
       }));
+      addNotification({
+        type: "FOLDER_CREATED",
+        title: `Folder Created: ${folderName}`,
+        username: "Someone",
+        status: "Active",
+      });
+
     });
     
     // Listen for file deletion
@@ -257,8 +293,14 @@ const CodeIDE = () => {
     });
 
     socket.on("userLeft", ({ username }) => {
-      //console.log(`👋 ${username} left the room`);
+      addNotification({
+        type: "USER_LEFT",
+        title: "User Left",
+        username,
+        status: "Inactive",
+      });
     });
+
 
     return () => {
       socket.off("joinedRoom");
@@ -892,6 +934,10 @@ const handleDeleteFile = (fileId) => {
                       </button>
 
                       <button
+                        onClick={() => 
+                           {
+                            setUserMenuOpen(false)
+                            setShowNotifications(!showNotifications)}}
                         className="w-full flex items-center gap-3 px-4 py-2.5 transition-all"
                         style={{
                           backgroundColor: 'transparent',
@@ -1394,6 +1440,49 @@ const handleDeleteFile = (fileId) => {
       </div>
       {/* // In your CodeIDE component, add this before the closing div: */}
         <AIAssistantSidebar theme={theme} activeFile={activeFile} />
+
+
+        {!sidebarCollapsed && showNotifications &&  (
+        <div
+          className="bg-[#0A0A0A] w-[76.5%] h-[100%] mx-3 mb-3 rounded-lg border absolute  text-stone-100"
+          style={{ borderColor: c.border , left : (sidebarCollapsed)? 0 : 267 }}
+        >
+          <div
+            className="flex items-center justify-between px-3 py-2 border-b"
+            style={{ borderColor: c.border }}
+          >
+            <span className="text-lg font-semibold">Notifications</span>
+            <div className="flex gap-3 ">
+
+            <button className="cursor-pointer ">
+              <Trash2 size={16} className="text-red-400 " />
+            </button>
+            <button 
+
+onClick={() => {
+  setShowNotifications(false)
+}}>
+              <X size={19} />
+            </button>
+              </div>
+
+          </div>
+
+          <div className="max-h-64 overflow-y-auto p-2">
+            {/* <CheckboxInTable  /> */}
+            {/* <CheckboxInTable username={username} /> */}
+            {showNotifications && (
+              <CheckboxInTable
+                tableData={notifications}
+                onClose={() => setShowNotifications(false)}
+              />
+          )}
+
+
+          </div>
+        </div>
+      )}
+
     </div>
      
   );

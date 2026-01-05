@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { FileIcon } from './FileIcon';
 import { useAuth } from '../lib/auth';
+import { useState } from 'react';
 
 
 
@@ -42,11 +43,14 @@ const AppSidebar = ({
   user,
   theme,
   onThemeChange,
-  connectedUsers
+  connectedUsers,
+  sidebarCollapsed
 }) => {
+    const [showNotifications, setShowNotifications] = useState(false)
 
   const {signout} = useAuth();
   return (
+    <>
     <Sidebar className="border-r border-[#3E3F3E]">
       
       <SidebarContent className="bg-[#171717]">
@@ -76,7 +80,7 @@ const AppSidebar = ({
                       placeholder="filename.ext"
                       className="w-full rounded-md border  bg-[#171717] px-3 py-2 text-sm text-[#D0D0D0] placeholder:text-[#3E3F3E] focus:outline-none"
                       autoFocus
-                    />
+                      />
                   
                 </SidebarMenuItem>
               )}
@@ -87,7 +91,7 @@ const AppSidebar = ({
                     onClick={() => onFileClick(file)}
                     isActive={activeFile?.id === file.id}
                     className="hover:bg-[#212121] hover:text-white h-10 cursor-pointer text-[#D0D0D0] data-[active=true]:bg-[#212121] data-[active=true]:text-amber-500"
-                  >
+                    >
                     <FileIcon language={file.language} size="small" />
                     <span>{file.name}</span>
                   </SidebarMenuButton>
@@ -121,7 +125,7 @@ const AppSidebar = ({
                 side="right" 
                 align="end"
                 className="w-72 bg-[#171717] border-[#3E3F3E] text-[#D0D0D0]"
-              >
+                >
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex items-center gap-3 py-2">
                     <Avatar className="h-12 w-12 border-2 border-[#3E3F3E]">
@@ -157,8 +161,11 @@ const AppSidebar = ({
                   <span>Billing</span>
                 </DropdownMenuItem>
                 
-                <DropdownMenuItem className="gap-3 focus:bg-[#212121] focus:text-[#D0D0D0] cursor-pointer">
+                <DropdownMenuItem 
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="gap-3 focus:bg-[#212121] focus:text-[#D0D0D0] cursor-pointer">
                   <Bell className="h-4 w-4" />
+                  
                   <span>Notifications</span>
                 </DropdownMenuItem>
                 
@@ -179,6 +186,29 @@ const AppSidebar = ({
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
+
+    {!sidebarCollapsed && showNotifications && (
+  <div
+    className="mx-3 mb-3 rounded-lg border"
+    style={{ borderColor: c.border, backgroundColor: c.bgSecondary }}
+  >
+    <div
+      className="flex items-center justify-between px-3 py-2 border-b"
+      style={{ borderColor: c.border }}
+    >
+      <span className="text-sm font-semibold">Notifications</span>
+      <button onClick={() => setShowNotifications(false)}>
+        <X size={14} />
+      </button>
+    </div>
+
+    <div className="max-h-64 overflow-y-auto p-2">
+      <CheckboxInTable />
+    </div>
+  </div>
+)}
+
+                </>
   );
 };
 

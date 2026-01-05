@@ -55,6 +55,7 @@ export function LoginCard() {
       };
     }, [socket]);
  
+    
 
   const joinRoom = async(roomId)=>{
     // Join the room via socket
@@ -64,6 +65,27 @@ export function LoginCard() {
     // console.log(`${socketId} joinded room ${roomId}`);
 
   };
+
+  const handleEnterKey = (e) => {
+    if (e.key === "Enter" && !loading) {
+      e.preventDefault();
+
+      // 👇 get live value from input
+      const enteredRoomId =
+        e.target.id === "roomId"
+          ? e.target.value.trim()
+          : roomId?.trim();
+
+
+      if (enteredRoomId) {
+        handleLoginAndJoinRoom(e);
+      } else {
+        handleLogin(e);
+      }
+    }
+  };
+
+
   const handleLogin = async (e) => {
     e?.preventDefault();
     setLoading(true);
@@ -154,9 +176,12 @@ export function LoginCard() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="m@example.com"
+                onKeyDown={handleEnterKey}
                 required
                 className="bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0] placeholder-[#3E3F3E] focus:ring-[#D0D0D0]"
               />
+            
+
             </div>
             <div className="grid gap-2">
               <div className="flex items-center">
@@ -177,6 +202,7 @@ export function LoginCard() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="********"
+                onKeyDown={handleEnterKey}
                 required
                 className="bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0] placeholder-[#3E3F3E] focus:ring-[#D0D0D0]"
               />
@@ -186,7 +212,7 @@ export function LoginCard() {
       </CardContent>
       <CardFooter className="flex-col gap-2">
         <Button
-          type="submit"
+          type="button"
           onClick={handleLogin}
           disabled={loading}
           className="w-full cursor-pointer hover:bg-[#3E3F3E] bg-white text-black hover:text-[#D0D0D0]"
@@ -199,6 +225,7 @@ export function LoginCard() {
           placeholder="room id"
           value={roomId}
           onChange={(e) => setRoomId(e.target.value)}
+          onKeyDown={handleEnterKey}
           className="bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0] placeholder-[#3E3F3E] focus:ring-[#D0D0D0]"
         />
         <Button

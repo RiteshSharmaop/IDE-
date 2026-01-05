@@ -75,7 +75,8 @@ const initSocket = (httpServer) => {
       addUserToRoom(roomId, socket.id, username);
 
       const room = getOrCreateRoom(roomId);
-
+      socket.username = username; // Store username in socket for later usesocket.username = username   // ✅ ADD THIS
+      socket.roomId = roomId
       //console.log(`${username} joined room ${roomId}`);
       //console.log(`Total users in room: ${room.users.length}`);
 
@@ -84,6 +85,7 @@ const initSocket = (httpServer) => {
         roomId: roomId,
         files: room.files,
         folders: room.folders,
+        
         users: room.users.map(u => ({ username: u.username, socketId: u.socketId }))
       });
 
@@ -93,8 +95,24 @@ const initSocket = (httpServer) => {
         username: username,
         totalUsers: room.users.length
       });
+
+
+      io.to(roomId).emit("notification", {
+        roomId,
+        type: "USER_JOINED",
+        username,
+        message: `${username} joined the room`,
+      })
+
+
+
     });
 
+
+
+
+
+    
     
     // Create File
     socket.on('createFile', ({ file, roomId, username }) => {
@@ -113,6 +131,15 @@ const initSocket = (httpServer) => {
         username: username,
         timestamp: new Date()
       });
+
+      // created file info to sender as well
+       io.to(roomId).emit("notification", {
+        roomId,
+        type: "FILE_CREATED",
+        username,
+        message: `${username} created file ${file.name}`,
+      })
+
 
       //console.log(`Total files in room ${roomId}: ${room.files.length}`);
     });
@@ -191,6 +218,16 @@ const initSocket = (httpServer) => {
         timestamp: new Date()
       });
 
+      
+
+      io.to(roomId).emit("notification", {
+        roomId,
+        type: "FOLDER_CREATED",
+        username,
+        message: `${username} created folder ${folderName}`,
+      })
+
+
       //console.log(`Total folders in room ${roomId}: ${room.folders.length}`);
     });
 
@@ -263,26 +300,58 @@ const initSocket = (httpServer) => {
 
    
     // Handle user disconnect
-    socket.on('disconnect', () => {
-      //console.log(`User disconnected: ${socket.id}`);
+    // socket.on('disconnect', () => {
+    //   //console.log(`User disconnected: ${socket.id}`);
 
-      // Remove user from all rooms they were in
+    //   // Remove user from all rooms they were in
+    //   const rooms = [...socket.rooms]
+    //   rooms.forEach((room, roomId) => {
+    //     const user = room.users.find(u => u.socketId === socket.id);
+    //     if (user) {
+    //       removeUserFromRoom(roomId, socket.id);
+
+    //       // Notify others in room
+    //       io.to(roomId).emit('someoneLeft', {
+    //         socketId: socket.id,
+    //         username: user.username,
+    //         totalUsers: room.users.length
+    //       });
+
+    //       socket.to(roomId).emit("notification", {
+    //         type: "USER_LEFT",
+    //         message: `${socket.username} left the room`,
+    //       })
+
+    //       //console.log(`${user.username} removed from room ${roomId}`);
+    //     }
+    //   });
+
+      
+    // });
+
+    socket.on("disconnect", () => {
       rooms.forEach((room, roomId) => {
-        const user = room.users.find(u => u.socketId === socket.id);
-        if (user) {
-          removeUserFromRoom(roomId, socket.id);
+        const user = room.users.find(u => u.socketId === socket.id)
+        if (!user) return
 
-          // Notify others in room
-          io.to(roomId).emit('someoneLeft', {
-            socketId: socket.id,
-            username: user.username,
-            totalUsers: room.users.length
-          });
+        removeUserFromRoom(roomId, socket.id)
 
-          //console.log(`${user.username} removed from room ${roomId}`);
-        }
-      });
-    });
+        io.to(roomId).emit("someoneLeft", {
+          socketId: socket.id,
+          username: user.username,
+          totalUsers: room.users.length,
+        })
+
+        io.to(roomId).emit("notification", {
+          roomId,
+          type: "USER_LEFT",
+          username: user.username,
+          message: `${user.username} left the room`,
+        })
+
+      })
+    })
+
 
     // Handle any errors
     socket.on('error', (error) => {
