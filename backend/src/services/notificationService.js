@@ -22,6 +22,29 @@ class NotificationService {
     metadata = {}
   ) {
     try {
+      // Prevent rapid duplicate notifications (same room, type, username/userId, within short window)
+      try {
+        const duplicateWindowMs = 5000; // 5 seconds
+        const since = new Date(Date.now() - duplicateWindowMs);
+        const dupQuery = {
+          roomId,
+          type,
+          createdAt: { $gte: since },
+        };
+        if (userId) dupQuery.userId = userId;
+        if (username) dupQuery.username = username;
+
+        const existing = await Notification.findOne(dupQuery).lean();
+        if (existing) {
+          console.log(
+            `🛑 Suppressing duplicate notification for user=${username} room=${roomId} type=${type}`
+          );
+          return existing;
+        }
+      } catch (dupErr) {
+        console.warn("⚠️ Duplicate check failed:", dupErr.message);
+        // continue to create notification if dup check fails
+      }
       // Create notification in MongoDB
       const notification = await Notification.create({
         roomId,

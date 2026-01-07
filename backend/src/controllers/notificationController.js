@@ -10,7 +10,7 @@ const Notification = require("../models/Notification");
 exports.getRoomNotifications = async (req, res) => {
   try {
     const { roomId } = req.params;
-    const { limit = 50 } = req.query;
+    const { limit = 10 } = req.query;
     console.log("Notification call came getRoomNotifications");
 
     const notifications = await NotificationService.getRoomNotifications(
@@ -47,7 +47,7 @@ exports.getUserNotifications = async (req, res) => {
   console.log("Notification call came getUserNotifications");
   try {
     const userId = req.user?.id || req.user?._id;
-    const { limit = 50 } = req.query;
+    const { limit = 10 } = req.query;
 
     const notifications = await NotificationService.getUserNotifications(
       userId,

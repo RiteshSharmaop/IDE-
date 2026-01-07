@@ -167,8 +167,13 @@ export default function CheckboxInTable() {
             read: notif.read,
           }));
 
-          setTableData(formattedNotifications.reverse());
-          setNotifications(formattedNotifications.reverse());
+          // API returns newest first; keep that order so newest notifications appear on top
+          // Ensure newest notifications appear on top by sorting descending by createdAt
+          const sorted = formattedNotifications.sort(
+            (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+          );
+          setTableData(sorted);
+          setNotifications(sorted);
         }
       } catch (error) {
         console.error("Error loading notifications:", error);
