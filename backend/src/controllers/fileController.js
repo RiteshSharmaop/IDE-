@@ -1,81 +1,81 @@
 // src/controllers/fileController.js
-const File = require('../models/File');
-const User = require('../models/User');
-const { 
+const File = require("../models/File");
+const User = require("../models/User");
+const {
   getRedisClient,
   cacheFile,
   getCachedFile,
   cacheFilesList,
   getCachedFilesList,
   invalidateUserFilesCache,
-  invalidateFileCache
-} = require('../config/redis');
+  invalidateFileCache,
+} = require("../config/redis");
 
 // Helper to get language from extension
 const getLanguageFromExtension = (filename) => {
-  const ext = filename.split('.').pop().toLowerCase();
+  const ext = filename.split(".").pop().toLowerCase();
   const langMap = {
-    'js': 'javascript',
-    'py': 'python',
-    'html': 'html',
-    'cpp': 'cpp',
-    'c': 'c',
-    'java': 'java',
-    'cs': 'csharp',
-    'css': 'css',
-    'json': 'json',
-    'md': 'markdown'
+    js: "javascript",
+    py: "python",
+    html: "html",
+    cpp: "cpp",
+    c: "c",
+    java: "java",
+    cs: "csharp",
+    css: "css",
+    json: "json",
+    md: "markdown",
   };
-  return langMap[ext] || 'plaintext';
+  return langMap[ext] || "plaintext";
 };
 
 // @desc    Create new file
 // @route   POST /api/files
 exports.createFile = async (req, res) => {
   try {
-    const { name, content = '', folder } = req.body;
+    const { name, content = "", folder } = req.body;
 
     if (!name) {
       return res.status(400).json({
         success: false,
-        message: 'File name is required'
-      });
-    } 
-    const userId = (req.user?.id || req.user?._id);  
-    
-    // TODO: "Check file with name for the user is already exists or not"
-    const alreadyExists = await File.findOne({
-      $and: [{ name }, { userId }]
-    });
-    if(alreadyExists){
-      return res.status(409).json({
-        success: false,
-        message: 'File name is already exists'
+        message: "File name is required",
       });
     }
-    
-    const extension = name.split('.').pop();
+    const userId = req.user?.id || req.user?._id;
+
+    // TODO: "Check file with name for the user is already exists or not"
+    const alreadyExists = await File.findOne({
+      $and: [{ name }, { userId }],
+    });
+    if (alreadyExists) {
+      return res.status(409).json({
+        success: false,
+        message: "File name is already exists",
+      });
+    }
+
+    const extension = name.split(".").pop();
     const language = getLanguageFromExtension(name);
-    
+
     // Create file
     const file = await File.create({
       name,
       content,
-      lang:language,
+      lang: language,
       extension,
       userId: userId,
-      folder: folder || "src"
+      folder: folder || "src",
     });
-    
+
     // Update user's file count
     await User.findByIdAndUpdate(userId, {
-      $inc: { filesCreated: 1 }
+      $inc: { filesCreated: 1 },
     });
-    
+
     console.log("Runn till heare,.....................");
     // Cache file in Redis (1 hour)
     await cacheFile(file._id.toString(), file, 3600);
-    
+
     // Increment user file count in Redis
     const cacheKey = `user:${userId}:fileCount`;
     await getRedisClient().incr(cacheKey);
@@ -83,16 +83,15 @@ exports.createFile = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'File created successfully',
-      data: { file }
+      message: "File created successfully",
+      data: { file },
     });
-
   } catch (error) {
-    console.error('Create file error:', error);
+    console.error("Create file error:", error);
     res.status(500).json({
       success: false,
-      message: 'Error creating file',
-      error: error.message
+      message: "Error creating file",
+      error: error.message,
     });
   }
 };
@@ -162,7 +161,7 @@ exports.createFile = async (req, res) => {
 // @route   GET /api/files
 exports.getFiles = async (req, res) => {
   try {
-    const { page = 1, limit = 50, search = '' } = req.query;
+    const { page = 1, limit = 50, search = "" } = req.query;
     const userId = req.user.id || req.user._id;
 
     // ✅ Check Redis cache first
@@ -171,14 +170,14 @@ exports.getFiles = async (req, res) => {
       return res.json({
         success: true,
         data: cachedFiles,
-        cached: true
+        cached: true,
       });
     }
 
     // Build query
     const query = { userId, isDeleted: false };
     if (search) {
-      query.name = { $regex: search, $options: 'i' };
+      query.name = { $regex: search, $options: "i" };
     }
 
     // Fetch from MongoDB
@@ -186,7 +185,7 @@ exports.getFiles = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit)
-      .select('-__v');
+      .select("-__v");
 
     const count = await File.countDocuments(query);
 
@@ -194,7 +193,7 @@ exports.getFiles = async (req, res) => {
       files,
       totalPages: Math.ceil(count / limit),
       currentPage: page,
-      total: count
+      total: count,
     };
 
     // ✅ Cache the files list (5 minutes)
@@ -202,19 +201,17 @@ exports.getFiles = async (req, res) => {
 
     res.json({
       success: true,
-      data: result
+      data: result,
     });
-
   } catch (error) {
-    console.error('Get files error:', error);
+    console.error("Get files error:", error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching files',
-      error: error.message
+      message: "Error fetching files",
+      error: error.message,
     });
   }
 };
-
 
 // @desc    Get single file
 // @route   GET /api/files/:id
@@ -229,7 +226,7 @@ exports.getFile = async (req, res) => {
       return res.json({
         success: true,
         data: { file: cachedFile },
-        cached: true
+        cached: true,
       });
     }
 
@@ -237,13 +234,13 @@ exports.getFile = async (req, res) => {
     const file = await File.findOne({
       _id: id,
       userId: req.user.id,
-      isDeleted: false
+      isDeleted: false,
     });
 
     if (!file) {
       return res.status(404).json({
         success: false,
-        message: 'File not found'
+        message: "File not found",
       });
     }
 
@@ -252,15 +249,14 @@ exports.getFile = async (req, res) => {
 
     res.json({
       success: true,
-      data: { file }
+      data: { file },
     });
-
   } catch (error) {
-    console.error('Get file error:', error);
+    console.error("Get file error:", error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching file',
-      error: error.message
+      message: "Error fetching file",
+      error: error.message,
     });
   }
 };
@@ -303,7 +299,7 @@ exports.getFile = async (req, res) => {
 //     // Invalidate user files list cache
 //     const cachePattern = `user:${req.user.id}:files:*`;
 //     // Note: In production, you'd want to use SCAN to delete pattern matches
-    
+
 //     res.json({
 //       success: true,
 //       message: 'File updated successfully',
@@ -319,8 +315,6 @@ exports.getFile = async (req, res) => {
 //     });
 //   }
 // };
-
-
 
 // @desc    Delete file
 // @route   DELETE /api/files/:id
@@ -380,13 +374,13 @@ exports.updateFile = async (req, res) => {
     if (!file) {
       return res.status(404).json({
         success: false,
-        message: 'File not found'
+        message: "File not found",
       });
     }
 
     if (name) {
       file.name = name;
-      file.extension = name.split('.').pop();
+      file.extension = name.split(".").pop();
       file.language = getLanguageFromExtension(name);
     }
     if (content !== undefined) file.content = content;
@@ -399,16 +393,15 @@ exports.updateFile = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'File updated successfully',
-      data: { file }
+      message: "File updated successfully",
+      data: { file },
     });
-
   } catch (error) {
-    console.error('Update file error:', error);
+    console.error("Update file error:", error);
     res.status(500).json({
       success: false,
-      message: 'Error updating file',
-      error: error.message
+      message: "Error updating file",
+      error: error.message,
     });
   }
 };
@@ -424,7 +417,7 @@ exports.deleteFile = async (req, res) => {
     if (!file) {
       return res.status(404).json({
         success: false,
-        message: 'File not found'
+        message: "File not found",
       });
     }
 
@@ -440,16 +433,102 @@ exports.deleteFile = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'File deleted successfully'
+      message: "File deleted successfully",
     });
-
   } catch (error) {
-    console.error('Delete file error:', error);
+    console.error("Delete file error:", error);
     res.status(500).json({
       success: false,
-      message: 'Error deleting file',
-      error: error.message
+      message: "Error deleting file",
+      error: error.message,
     });
   }
 };
 
+// @desc    Save file to room
+// @route   POST /api/files/:fileId/save-to-room/:roomId
+// @access  Private
+exports.saveFileToRoom = async (req, res) => {
+  try {
+    const { fileId, roomId } = req.params;
+    const userId = req.user.id || req.user._id;
+    const UserRoom = require("../models/UserRoom");
+
+    const file = await File.findOne({ _id: fileId, userId, isDeleted: false });
+    if (!file) {
+      return res.status(404).json({
+        success: false,
+        message: "File not found",
+      });
+    }
+
+    const userRoom = await UserRoom.findOne({ userId, roomId });
+    if (!userRoom) {
+      return res.status(404).json({
+        success: false,
+        message: "Room not found",
+      });
+    }
+
+    // Add file to room if not already there
+    if (!userRoom.files.includes(fileId)) {
+      userRoom.files.push(fileId);
+      await userRoom.save();
+    }
+
+    // Update file's lastAccessed
+    file.lastExecuted = new Date();
+    await file.save();
+    await cacheFile(fileId, file, 3600);
+
+    res.status(200).json({
+      success: true,
+      message: "File saved to room successfully",
+      data: { userRoom },
+    });
+  } catch (error) {
+    console.error("Save file to room error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error saving file to room",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get room files
+// @route   GET /api/files/room/:roomId
+// @access  Private
+exports.getRoomFiles = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const userId = req.user.id || req.user._id;
+    const UserRoom = require("../models/UserRoom");
+
+    const userRoom = await UserRoom.findOne({ userId, roomId }).populate(
+      "files"
+    );
+    if (!userRoom) {
+      return res.status(404).json({
+        success: false,
+        message: "Room not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        roomId,
+        files: userRoom.files,
+        count: userRoom.files.length,
+      },
+    });
+  } catch (error) {
+    console.error("Get room files error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching room files",
+      error: error.message,
+    });
+  }
+};

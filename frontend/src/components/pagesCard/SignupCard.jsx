@@ -58,11 +58,21 @@ export function SignupCard() {
   }, [socket]);
 
   const joinRoom = async (roomId) => {
-    // Join the room via socket
-    socket.emit("joinRoom", { roomId });
-    console.log("Joined Room");
+    // Join the room via socket (include user info from localStorage if available)
+    const cached = localStorage.getItem("user");
+    let userObj = null;
+    try {
+      userObj = cached ? JSON.parse(cached) : null;
+    } catch {}
 
-    // console.log(`${socketId} joinded room ${roomId}`);
+    const payload = {
+      roomId,
+      username: userObj?.username,
+      userId: userObj?._id || userObj?.id,
+    };
+
+    socket.emit("joinRoom", payload);
+    console.log("Joined Room", payload);
   };
   const handleSignup = async (e) => {
     e?.preventDefault();
@@ -161,7 +171,6 @@ export function SignupCard() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="********"
                   autoComplete="new-password"
-
                   className="bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0]
                placeholder-[#3E3F3E] focus:ring-[#D0D0D0] pr-10"
                 />

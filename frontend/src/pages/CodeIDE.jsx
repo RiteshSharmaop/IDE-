@@ -42,6 +42,13 @@ import AIAssistantSidebar from "../components/AiAssistantSidebar";
 import { Empty } from "../components/ui/empty";
 import ShareDialog from "../components/ShareDialog";
 import CheckboxInTable from "../components/CheckboxInTable";
+import RoomsSidebar from "../components/RoomsSidebar";
+import {
+  getUserRooms,
+  createUserRoom,
+  deleteUserRoom,
+  saveFileToRoom,
+} from "../lib/roomApi";
 
 const CodeIDE = () => {
   const [theme, setTheme] = useState("dark");
@@ -95,6 +102,9 @@ const CodeIDE = () => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [rooms, setRooms] = useState([]);
+  const [activeRoom, setActiveRoom] = useState(null);
+  const [loadingRooms, setLoadingRooms] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
 
@@ -107,6 +117,13 @@ const CodeIDE = () => {
   //   plan: 'Free'
   // };
   const { user, signout } = useAuth();
+
+  // DEBUG: Log user availability
+  useEffect(() => {
+    console.log("👤 User state changed:", {
+      user: user ? { id: user._id, username: user.username } : null,
+    });
+  }, [user]);
 
   //  Track if the change is from remote user to prevent echo
   const isRemoteChange = useRef(false);
@@ -148,17 +165,6 @@ const CodeIDE = () => {
     },
   };
 
-  const addNotification = (notification) => {
-    setNotifications((prev) => [
-      {
-        id: Date.now() + Math.random(),
-        timestamp: new Date().toLocaleTimeString(),
-        ...notification,
-      },
-      ...prev,
-    ]);
-  };
-
   const c = colors[theme];
 
   const getLanguageColor = (lang) => {
@@ -189,20 +195,31 @@ const CodeIDE = () => {
 
     const savedRoomId = localStorage.getItem("roomId");
 
-    // If socket is connected but page refreshed, rejoin the room
-    if (savedRoomId && socket.connected) {
-      socket.emit("joinRoom", { roomId: savedRoomId, username: user.username });
+    // If socket is connected but page refreshed, rejoin the room only when user is available
+    if (savedRoomId && socket.connected && user && user._id) {
+      console.log("🔄 Rejoining after refresh:", {
+        roomId: savedRoomId,
+        username: user.username,
+        userId: user._id,
+      });
+      socket.emit("joinRoom", {
+        roomId: savedRoomId,
+        username: user.username,
+        userId: user._id,
+      });
       setRoomId(savedRoomId);
-      //console.log("♻️ Rejoined existing room:", savedRoomId);
     }
 
-    // If socket reconnects (for example, after refresh)
+    // If socket reconnects (for example, after refresh) only rejoin when user is available
     socket.on("connect", () => {
       const rejoinId = localStorage.getItem("roomId");
-      if (rejoinId) {
-        socket.emit("joinRoom", { roomId: rejoinId, username: user.username });
+      if (rejoinId && user && user._id) {
+        socket.emit("joinRoom", {
+          roomId: rejoinId,
+          username: user.username,
+          userId: user._id,
+        });
         setRoomId(rejoinId);
-        //console.log("🔁 Rejoined room after reconnect:", rejoinId);
       }
     });
 
@@ -212,12 +229,6 @@ const CodeIDE = () => {
 
     socket.on("someoneJoined", ({ username }) => {
       console.log(`✅ SomeJoined room ${username}`);
-      addNotification({
-        type: "USER_JOINED",
-        title: "User Joined",
-        username,
-        status: "Active",
-      });
     });
 
     socket.on("fileSetActive", ({ fileId }) => {
@@ -243,12 +254,6 @@ const CodeIDE = () => {
         }
         return [...prev, file];
       });
-      addNotification({
-        type: "FILE_CREATED",
-        title: `File Created: ${file.name}`,
-        username: "Someone",
-        status: "Active",
-      });
     });
 
     // Listen for folder creation from other users
@@ -262,12 +267,6 @@ const CodeIDE = () => {
         ...prev,
         [folderName]: true,
       }));
-      addNotification({
-        type: "FOLDER_CREATED",
-        title: `Folder Created: ${folderName}`,
-        username: "Someone",
-        status: "Active",
-      });
     });
 
     // Listen for file deletion
@@ -325,14 +324,7 @@ const CodeIDE = () => {
       }
     );
 
-    socket.on("userLeft", ({ username }) => {
-      addNotification({
-        type: "USER_LEFT",
-        title: "User Left",
-        username,
-        status: "Inactive",
-      });
-    });
+    socket.on("userLeft", ({ username }) => {});
 
     return () => {
       socket.off("joinedRoom");
@@ -345,6 +337,44 @@ const CodeIDE = () => {
       socket.off("fileDeleted");
     };
   }, [socket]);
+
+  // If user becomes available after socket connected, ensure we rejoin saved room
+  useEffect(() => {
+    if (!socket || !user || !user._id) return;
+
+    const savedRoomId = localStorage.getItem("roomId");
+    if (savedRoomId && socket.connected && !roomId) {
+      console.log("📌 User available, joining saved room:", {
+        roomId: savedRoomId,
+        username: user.username,
+        userId: user._id,
+      });
+      socket.emit("joinRoom", {
+        roomId: savedRoomId,
+        username: user.username,
+        userId: user._id,
+      });
+      setRoomId(savedRoomId);
+    }
+  }, [socket, user, roomId]);
+
+  // When active room changes, join that room
+  useEffect(() => {
+    if (!activeRoom || !user || !user._id || !socket) return;
+
+    console.log("🎯 Active room changed, joining:", {
+      roomId: activeRoom.roomId,
+      username: user.username,
+      userId: user._id,
+    });
+    localStorage.setItem("roomId", activeRoom.roomId);
+    socket.emit("joinRoom", {
+      roomId: activeRoom.roomId,
+      username: user.username,
+      userId: user._id,
+    });
+    setRoomId(activeRoom.roomId);
+  }, [activeRoom, user, socket]);
 
   const handleFileClosed = ({ fileId }) => {
     //console.log("File closed by another user:", fileId);
@@ -528,7 +558,8 @@ const CodeIDE = () => {
       socket.emit("createFile", {
         file: newFile,
         roomId: roomId,
-        username: user.username,
+        username: user?.username,
+        userId: user?._id,
       });
 
       setNewFileName("");
@@ -545,7 +576,8 @@ const CodeIDE = () => {
       socket.emit("createFolder", {
         folderName: newFolderName,
         roomId: roomId,
-        username: user.username,
+        username: user?.username,
+        userId: user?._id,
       });
 
       setNewFolderName("");
@@ -612,7 +644,9 @@ const CodeIDE = () => {
     socket.emit("deleteFile", {
       fileId: fileId,
       roomId: roomId,
-      username: user.username,
+      username: user?.username,
+      userId: user?._id,
+      fileName: files.find((f) => f.id === fileId)?.name,
     });
   };
 
@@ -676,6 +710,51 @@ const CodeIDE = () => {
   const handleFileTabs = (file) => {
     setActiveFile(file);
     socket.emit("setFileActive", file.id, roomId);
+  };
+
+  // ============= ROOM HANDLERS =============
+  const loadUserRooms = async () => {
+    try {
+      setLoadingRooms(true);
+      const response = await getUserRooms();
+      if (response.success) {
+        setRooms(response.data);
+      }
+    } catch (error) {
+      console.error("Error loading rooms:", error);
+    } finally {
+      setLoadingRooms(false);
+    }
+  };
+
+  const handleCreateRoom = async (roomData) => {
+    try {
+      const response = await createUserRoom(roomData);
+      if (response.success) {
+        setRooms([...rooms, response.data]);
+        setActiveRoom(response.data);
+      }
+    } catch (error) {
+      console.error("Error creating room:", error);
+    }
+  };
+
+  const handleDeleteRoom = async (roomId) => {
+    try {
+      const response = await deleteUserRoom(roomId);
+      if (response.success) {
+        setRooms(rooms.filter((r) => r.roomId !== roomId));
+        if (activeRoom?.roomId === roomId) {
+          setActiveRoom(null);
+        }
+      }
+    } catch (error) {
+      console.error("Error deleting room:", error);
+    }
+  };
+
+  const handleRoomClick = (room) => {
+    setActiveRoom(room);
   };
 
   // const handleEditorChange = (value) => {
@@ -1220,7 +1299,6 @@ const CodeIDE = () => {
               style={{ backgroundColor: c.bgSecondary, borderColor: c.border }}
             >
               {openFiles.map((file) => (
-                
                 <button
                   key={file.id}
                   onClick={() => handleFileTabs(file)}
@@ -1715,15 +1793,8 @@ const CodeIDE = () => {
             </div>
           </div>
 
-          <div className="max-h-64 overflow-y-auto p-2">
-            {/* <CheckboxInTable  /> */}
-            {/* <CheckboxInTable username={username} /> */}
-            {showNotifications && (
-              <CheckboxInTable
-                tableData={notifications}
-                onClose={() => setShowNotifications(false)}
-              />
-            )}
+          <div className="max-h-[calc(100vh-120px)] overflow-y-auto p-2">
+            <CheckboxInTable />
           </div>
         </div>
       )}

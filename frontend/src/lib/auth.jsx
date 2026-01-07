@@ -5,6 +5,11 @@ import { useRoom } from "../context/RoomContext";
 
 const AuthContext = createContext(null);
 
+// Helper function to get auth token from localStorage
+export function getAuthToken() {
+  return localStorage.getItem("token");
+}
+
 export function AuthProvider({ children }) {
   const files = []; // or fetched later
   const [user, setUser] = useState({
@@ -15,14 +20,13 @@ export function AuthProvider({ children }) {
     lastLogin: "",
     theme: "dark",
     filesCreated: files.length || 0,
-    plan: 'Free',
-    avatar: '',
+    plan: "Free",
+    avatar: "",
   });
 
   const [loading, setLoading] = useState(true);
 
-  const {roomId , setRoomId} = useRoom();
-  
+  const { roomId, setRoomId } = useRoom();
 
   useEffect(() => {
     const init = async () => {
@@ -49,10 +53,14 @@ export function AuthProvider({ children }) {
 
           // Merge backend user with your extra fields
           const mergedUser = {
-            ...user,            // keep defaults like theme
-            ...backendUser,     // override with backend data
+            ...user, // keep defaults like theme
+            ...backendUser, // override with backend data
             filesCreated: files.length || 0,
           };
+
+          // Ensure both `id` and `_id` are present for compatibility
+          if (!mergedUser._id && mergedUser.id) mergedUser._id = mergedUser.id;
+          if (!mergedUser.id && mergedUser._id) mergedUser.id = mergedUser._id;
 
           setUser(mergedUser);
           localStorage.setItem("user", JSON.stringify(mergedUser));
@@ -74,21 +82,25 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signin = (token, userObj) => {
+    // Normalize user object to include both `id` and `_id`
+    const normalized = { ...userObj };
+    if (!normalized._id && normalized.id) normalized._id = normalized.id;
+    if (!normalized.id && normalized._id) normalized.id = normalized._id;
+
     localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(userObj));
-    setUser(userObj);
+    localStorage.setItem("user", JSON.stringify(normalized));
+    setUser(normalized);
   };
 
   const signout = async () => {
     try {
       await api.post("/api/auth/logout");
-      console.log("Logout Room : " , roomId);
+      console.log("Logout Room : ", roomId);
       setRoomId("");
-      
     } catch {}
     localStorage.removeItem("token");
-    localStorage.removeItem("user");;
-    localStorage.removeItem("roomId");;
+    localStorage.removeItem("user");
+    localStorage.removeItem("roomId");
     setUser(null);
   };
 

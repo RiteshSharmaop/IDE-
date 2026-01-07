@@ -57,8 +57,21 @@ export function LoginCard() {
 
   const joinRoom = async (roomId) => {
     // Join the room via socket
-    socket.emit("joinRoom", { roomId });
-    console.log("Joined Room");
+    // If user info exists in localStorage or auth, include it
+    const cached = localStorage.getItem("user");
+    let userObj = null;
+    try {
+      userObj = cached ? JSON.parse(cached) : null;
+    } catch {}
+
+    const payload = {
+      roomId,
+      username: userObj?.username,
+      userId: userObj?._id || userObj?.id,
+    };
+
+    socket.emit("joinRoom", payload);
+    console.log("Joined Room", payload);
 
     // console.log(`${socketId} joinded room ${roomId}`);
   };

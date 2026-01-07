@@ -12,7 +12,7 @@
 //     // ✅ Listen for socket connection
 //     socket.on("connect", () => {
 //       console.log("🟢 Connected:", socket.id);
-      
+
 //       setSocketId(socket.id);
 //       setIsConnected(true);
 //     });
@@ -58,13 +58,15 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     // Initialize socket connection
-    
+
     const SOCKET_URL = import.meta.env.VITE_BACKEND_URL;
     const newSocket = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
+      // Don't disconnect when context unmounts in dev mode
+      forceNew: false,
     });
 
     setSocket(newSocket);
@@ -80,8 +82,23 @@ export const SocketProvider = ({ children }) => {
       setSocketId(null);
     });
 
-    // Cleanup when unmounting
-    return () => newSocket.disconnect();
+    // Only log errors for debugging
+    newSocket.on("error", (error) => {
+      console.error("❌ Socket error:", error);
+    });
+
+    newSocket.on("connect_error", (error) => {
+      console.error("❌ Socket connection error:", error);
+    });
+
+    // Don't disconnect on component unmount - let Socket.io manage connection
+    return () => {
+      // Clean up listeners but don't disconnect the socket
+      newSocket.off("connect");
+      newSocket.off("disconnect");
+      newSocket.off("error");
+      newSocket.off("connect_error");
+    };
   }, []);
 
   return (
@@ -97,4 +114,3 @@ export const useSocket = () => {
     throw new Error("useSocket must be used within a SocketProvider");
   return context;
 };
-
