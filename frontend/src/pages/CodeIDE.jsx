@@ -131,6 +131,9 @@ const CodeIDE = () => {
   // Debounce timer for code changes
   const debounceTimer = useRef(null);
 
+  // Ref to control notifications table actions (e.g., delete all)
+  const notificationsRef = useRef(null);
+
   // Sophisticated Color Palette
   const colors = {
     dark: {
@@ -1780,7 +1783,27 @@ const CodeIDE = () => {
           >
             <span className="text-lg font-semibold">Notifications</span>
             <div className="flex gap-3 ">
-              <button className="cursor-pointer ">
+              <button
+                className="cursor-pointer "
+                onClick={() => {
+                  const api = notificationsRef?.current;
+                  if (!api) return;
+                  const selected = api.getSelectedCount
+                    ? api.getSelectedCount()
+                    : 0;
+                  if (selected > 0) {
+                    const ok = window.confirm(
+                      `Delete ${selected} selected notification${
+                        selected > 1 ? "s" : ""
+                      }?`
+                    );
+                    if (!ok) return;
+                    api.deleteSelected();
+                  } else {
+                    alert("No notifications selected");
+                  }
+                }}
+              >
                 <Trash2 size={16} className="text-red-400 " />
               </button>
               <button
@@ -1794,7 +1817,7 @@ const CodeIDE = () => {
           </div>
 
           <div className="max-h-[calc(100vh-120px)] overflow-y-auto p-2">
-            <CheckboxInTable />
+            <CheckboxInTable ref={notificationsRef} />
           </div>
         </div>
       )}

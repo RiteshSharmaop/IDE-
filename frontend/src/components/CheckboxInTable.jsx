@@ -1,6 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, {
+  useEffect,
+  useState,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import {
   Table,
   TableHeader,
@@ -38,7 +43,7 @@ const typeLabel = {
   FOLDER_DELETED: "Folder Deleted",
 };
 
-export default function CheckboxInTable() {
+const CheckboxInTable = forwardRef((props, ref) => {
   const [selectedRows, setSelectedRows] = useState(new Set([]));
   const [notifications, setNotifications] = useState([]);
   const [tableData, setTableData] = useState([]);
@@ -205,6 +210,99 @@ export default function CheckboxInTable() {
     setSelectedRows(newSelected);
   };
 
+  // Delete a single notification
+  const handleDeleteNotification = async (notifId) => {
+    try {
+      await fetch(
+        `${
+          import.meta.env.VITE_API_URL || "http://localhost:8000"
+        }/api/notifications/${notifId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+    } catch (error) {
+      console.error(`Error deleting notification ${notifId}:`, error);
+    }
+
+    setTableData((prev) => prev.filter((row) => row.id !== notifId));
+    setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+    setSelectedRows((prev) => {
+      const copy = new Set(prev);
+      copy.delete(notifId);
+      return copy;
+    });
+  };
+
+  // Expose imperative methods to parent via ref
+  useImperativeHandle(
+    ref,
+    () => ({
+      getSelectedCount: () => selectedRows.size,
+      deleteSelected: async () => {
+        const toDelete = Array.from(selectedRows);
+        if (toDelete.length === 0) return 0;
+
+        for (const notifId of toDelete) {
+          try {
+            await fetch(
+              `${
+                import.meta.env.VITE_API_URL || "http://localhost:8000"
+              }/api/notifications/${notifId}`,
+              {
+                method: "DELETE",
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
+              }
+            );
+          } catch (error) {
+            console.error(`Error deleting notification ${notifId}:`, error);
+          }
+        }
+
+        setTableData((prev) =>
+          prev.filter((row) => !toDelete.includes(row.id))
+        );
+        setNotifications((prev) =>
+          prev.filter((n) => !toDelete.includes(n.id))
+        );
+        setSelectedRows(new Set());
+
+        return toDelete.length;
+      },
+      deleteAll: async () => {
+        const toDelete = tableData.map((r) => r.id);
+
+        for (const notifId of toDelete) {
+          try {
+            await fetch(
+              `${
+                import.meta.env.VITE_API_URL || "http://localhost:8000"
+              }/api/notifications/${notifId}`,
+              {
+                method: "DELETE",
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
+              }
+            );
+          } catch (error) {
+            console.error(`Error deleting notification ${notifId}:`, error);
+          }
+        }
+
+        setTableData([]);
+        setNotifications([]);
+        setSelectedRows(new Set());
+      },
+    }),
+    [selectedRows, tableData]
+  );
+
   // Delete selected notifications
   const handleDeleteSelected = async () => {
     const toDelete = Array.from(selectedRows);
@@ -273,7 +371,7 @@ export default function CheckboxInTable() {
   return (
     <div className="w-full">
       {/* Action Bar */}
-      {selectedRows.size > 0 && (
+      {/* {selectedRows.size > 0 && (
         <div className="flex gap-2 mb-4 p-3 bg-[#1a1a1a] rounded-lg">
           <button
             onClick={handleMarkAsRead}
@@ -290,7 +388,7 @@ export default function CheckboxInTable() {
             Delete ({selectedRows.size})
           </button>
         </div>
-      )}
+      )} */}
 
       {/* Notifications Table */}
       <Table className="bg-[#0A0A0A] text-white">
@@ -307,6 +405,7 @@ export default function CheckboxInTable() {
             <TableHead className="text-white">Message</TableHead>
             <TableHead className="text-white">Type</TableHead>
             <TableHead className="text-white">Status</TableHead>
+            <TableHead className="text-white">Actions</TableHead>
             <TableHead className="text-white text-right">Time</TableHead>
           </TableRow>
         </TableHeader>
@@ -314,7 +413,7 @@ export default function CheckboxInTable() {
         <TableBody>
           {tableData.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+              <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                 No notifications yet
               </TableCell>
             </TableRow>
@@ -361,6 +460,18 @@ export default function CheckboxInTable() {
                     {row.status}
                   </span>
                 </TableCell>
+                <TableCell className="text-right">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteNotification(row.id);
+                    }}
+                    className="p-1 text-red-400 hover:text-red-500 rounded"
+                    aria-label="Delete notification"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </TableCell>
                 <TableCell className="text-right text-xs text-gray-400 flex items-center justify-end gap-1">
                   <Clock size={14} />
                   {formatTime(row.createdAt)}
@@ -380,4 +491,6 @@ export default function CheckboxInTable() {
       )}
     </div>
   );
-}
+});
+
+export default CheckboxInTable;
