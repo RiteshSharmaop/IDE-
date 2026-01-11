@@ -2,7 +2,17 @@
 # 🚀 HexaHub – Real-Time Collaborative IDE with Event-Driven AI Architecture
 
 Live: https://hexahub-mern.onrender.com
+
+
 Notion Link: https://www.notion.so/Multi-user-IDE-26be870d6d9b80b0aadbc1b8d67fc468?source=copy_link
+
+
+## Collaborative Code Editor System Design.
+![image](https://github.com/RiteshSharmaop/IDE-/blob/main/codeEditor%20SystemDesign.png)
+
+
+## Code Compilation System Design.
+![image](https://github.com/RiteshSharmaop/IDE-/blob/main/compilation%20SystemDesign.png)
 
 
 HexaHub is a **real-time collaborative IDE** that allows multiple users to write, edit, and execute code together in shared sessions with **low latency and high scalability**.  
