@@ -33,6 +33,11 @@ import {
 
 import { MonacoEditor } from "../components/Editor/MonacoEditor";
 import { runTheCode } from "../lib/codeExecute";
+import {
+  trackCodeExecution,
+  trackFileOperation,
+  trackIDEMetrics,
+} from "../lib/kafkaTracking";
 import { useAuth } from "../lib/auth";
 import { useSocket } from "../context/SocketContext";
 import { Link, useNavigate } from "react-router-dom";
@@ -107,6 +112,7 @@ const CodeIDE = () => {
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [remoteCursors, setRemoteCursors] = useState(new Map()); // Track remote user cursors
 
   const navigate = useNavigate();
   // Mock user data
@@ -131,8 +137,19 @@ const CodeIDE = () => {
   // Debounce timer for code changes
   const debounceTimer = useRef(null);
 
+  // Debounce timer for cursor position updates
+  const cursorDebounceTimer = useRef(null);
+
+  // Ref to store editor instance for cursor tracking during typing
+  const editorInstanceRef = useRef(null);
+
   // Ref to control notifications table actions (e.g., delete all)
   const notificationsRef = useRef(null);
+
+  // Refs to store current values for use in debounced callbacks
+  const currentActiveFileRef = useRef(null);
+  const currentRoomIdRef = useRef(null);
+  const currentSocketRef = useRef(null);
 
   // Sophisticated Color Palette
   const colors = {
@@ -185,6 +202,19 @@ const CodeIDE = () => {
 
   const { roomId, setRoomId } = useRoom();
 
+  // Sync refs with current values
+  useEffect(() => {
+    currentActiveFileRef.current = activeFile;
+  }, [activeFile]);
+
+  useEffect(() => {
+    currentRoomIdRef.current = roomId;
+  }, [roomId]);
+
+  useEffect(() => {
+    currentSocketRef.current = socket;
+  }, [socket]);
+
   useEffect(() => {
     if (!socket.id) {
       navigate("/");
@@ -195,36 +225,6 @@ const CodeIDE = () => {
 
   useEffect(() => {
     if (!socket) return;
-
-    const savedRoomId = localStorage.getItem("roomId");
-
-    // If socket is connected but page refreshed, rejoin the room only when user is available
-    if (savedRoomId && socket.connected && user && user._id) {
-      console.log("🔄 Rejoining after refresh:", {
-        roomId: savedRoomId,
-        username: user.username,
-        userId: user._id,
-      });
-      socket.emit("joinRoom", {
-        roomId: savedRoomId,
-        username: user.username,
-        userId: user._id,
-      });
-      setRoomId(savedRoomId);
-    }
-
-    // If socket reconnects (for example, after refresh) only rejoin when user is available
-    socket.on("connect", () => {
-      const rejoinId = localStorage.getItem("roomId");
-      if (rejoinId && user && user._id) {
-        socket.emit("joinRoom", {
-          roomId: rejoinId,
-          username: user.username,
-          userId: user._id,
-        });
-        setRoomId(rejoinId);
-      }
-    });
 
     socket.on("joinedRoom", ({ roomId }) => {
       //console.log(`✅ Joined room ${roomId}`);
@@ -328,25 +328,61 @@ const CodeIDE = () => {
     );
 
     socket.on("userLeft", ({ username }) => {});
+    // Remote cursor position tracking
+    socket.on(
+      "remoteCursorMoved",
+      ({ socketId, username, cursorPosition, fileId }) => {
+        if (!cursorPosition) return;
+
+        console.log("📍 Remote cursor moved:", {
+          socketId,
+          username,
+          cursorPosition,
+          fileId,
+          activeFileId: activeFile?.id,
+        });
+
+        // Only show cursor if it's in the currently active file
+        if (activeFile?.id === fileId) {
+          setRemoteCursors((prev) => {
+            const updated = new Map(prev);
+            updated.set(socketId, {
+              ...cursorPosition,
+              username: username,
+            });
+            console.log(
+              "✅ Cursor updated for",
+              username,
+              "total cursors:",
+              updated.size
+            );
+            return updated;
+          });
+        }
+      }
+    );
 
     return () => {
       socket.off("joinedRoom");
       socket.off("someoneJoined");
       socket.off("fileChanged");
-      socket.off("connect");
       socket.off("fileCreated");
       socket.off("folderCreated");
       socket.off("codeExecuted");
       socket.off("fileDeleted");
+      socket.off("remoteCursorMoved");
     };
   }, [socket]);
 
+  // Ref to track if we've already attempted to rejoin on mount
+  const hasRejoinedRef = useRef(false);
+
   // If user becomes available after socket connected, ensure we rejoin saved room
   useEffect(() => {
-    if (!socket || !user || !user._id) return;
+    if (!socket || !user || !user._id || hasRejoinedRef.current) return;
 
     const savedRoomId = localStorage.getItem("roomId");
-    if (savedRoomId && socket.connected && !roomId) {
+    if (savedRoomId && socket.connected) {
       console.log("📌 User available, joining saved room:", {
         roomId: savedRoomId,
         username: user.username,
@@ -358,8 +394,9 @@ const CodeIDE = () => {
         userId: user._id,
       });
       setRoomId(savedRoomId);
+      hasRejoinedRef.current = true; // Mark that we've rejoined
     }
-  }, [socket, user, roomId]);
+  }, [socket, user]);
 
   // When active room changes, join that room
   useEffect(() => {
@@ -460,6 +497,9 @@ const CodeIDE = () => {
     // Emit socket event for real-time sync
     socket.emit("fileChange", file.id, roomId);
 
+    // Clear remote cursors when switching files
+    setRemoteCursors(new Map());
+
     // Immediately update local state
     setActiveFile(file);
 
@@ -504,6 +544,17 @@ const CodeIDE = () => {
       openFiles.map((f) => (f.id === activeFile.id ? updatedFile : f))
     );
 
+    // Emit cursor position immediately when typing (cursor moves as you type)
+    if (editorInstanceRef.current) {
+      const position = editorInstanceRef.current.getPosition();
+      if (position) {
+        handleCursorChange({
+          line: position.lineNumber - 1,
+          column: position.column - 1,
+        });
+      }
+    }
+
     // Debounce socket emission to avoid too many events
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
@@ -518,6 +569,81 @@ const CodeIDE = () => {
         roomId: roomId,
       });
     }, 300); // 300ms debounce - adjust as needed
+  };
+
+  // 🔥🔥🔥 CURSOR POSITION CHANGE HANDLER 🔥🔥🔥
+  const handleCursorChange = (cursorPosition) => {
+    if (!cursorPosition) return;
+
+    console.log("📱 Cursor changed at:", {
+      line: cursorPosition.line,
+      column: cursorPosition.column,
+    });
+
+    // Get current values immediately
+    const currentFile = currentActiveFileRef.current;
+    const currentRoom = currentRoomIdRef.current;
+    const currentSocket = currentSocketRef.current;
+
+    // Validate all required values are available
+    if (
+      !currentFile ||
+      !currentRoom ||
+      !currentSocket ||
+      !currentSocket.connected
+    ) {
+      console.warn("⚠️ Cannot emit cursor - missing required data:", {
+        hasFile: !!currentFile,
+        hasRoom: !!currentRoom,
+        hasSocket: !!currentSocket,
+        socketConnected: currentSocket?.connected,
+      });
+      return;
+    }
+
+    // EMIT IMMEDIATELY - don't wait for debounce
+    console.log("🚀 Emitting cursor move IMMEDIATELY...", {
+      fileId: currentFile.id,
+      roomId: currentRoom,
+      position: cursorPosition,
+    });
+    currentSocket.emit("cursorMove", {
+      fileId: currentFile.id,
+      roomId: currentRoom,
+      cursorPosition,
+    });
+
+    // Also debounce to prevent network flooding on rapid changes
+    if (cursorDebounceTimer.current) {
+      clearTimeout(cursorDebounceTimer.current);
+    }
+
+    cursorDebounceTimer.current = setTimeout(() => {
+      // Emit again with latest position (in case there were rapid changes)
+      const latestFile = currentActiveFileRef.current;
+      const latestRoom = currentRoomIdRef.current;
+      const latestSocket = currentSocketRef.current;
+
+      if (
+        !latestFile ||
+        !latestRoom ||
+        !latestSocket ||
+        !latestSocket.connected
+      ) {
+        return;
+      }
+
+      console.log("🚀 Emitting cursor move (debounced)...", {
+        fileId: latestFile.id,
+        roomId: latestRoom,
+        position: cursorPosition,
+      });
+      latestSocket.emit("cursorMove", {
+        fileId: latestFile.id,
+        roomId: latestRoom,
+        cursorPosition,
+      });
+    }, 100); // 100ms debounce for optimization
   };
 
   // .................................................................................
@@ -565,6 +691,15 @@ const CodeIDE = () => {
         userId: user?._id,
       });
 
+      // ✅ TRACK FILE CREATION IN KAFKA
+      trackFileOperation({
+        operation: "create",
+        fileName: newFile.name,
+        filePath: `${newFile.folder}/${newFile.name}`,
+        language: newFile.language,
+        roomId: roomId,
+      });
+
       setNewFileName("");
       setIsCreatingFile(false);
     }
@@ -583,6 +718,15 @@ const CodeIDE = () => {
         userId: user?._id,
       });
 
+      // ✅ TRACK FOLDER CREATION IN KAFKA
+      trackFileOperation({
+        operation: "create",
+        fileName: newFolderName,
+        filePath: newFolderName,
+        language: "folder",
+        roomId: roomId,
+      });
+
       setNewFolderName("");
       setIsCreatingFolder(false);
     }
@@ -598,7 +742,7 @@ const CodeIDE = () => {
     if (!activeFile) return;
 
     setOutputContent(`Running ${activeFile.name}...`);
-    //console.log("Running:", activeFile);
+    const startTime = performance.now();
 
     try {
       const input = terminalInputValue;
@@ -607,6 +751,8 @@ const CodeIDE = () => {
         activeFile.content,
         input
       );
+
+      const executionTime = Math.round(performance.now() - startTime);
 
       setOutputContent(`${res.output}`);
       setErrorContent("");
@@ -623,11 +769,35 @@ const CodeIDE = () => {
         roomId: roomId,
         username: user.username,
       });
+
+      // ✅ TRACK CODE EXECUTION IN KAFKA
+      await trackCodeExecution({
+        fileName: activeFile.name,
+        language: activeFile.language,
+        executionTime: executionTime,
+        status: res.error ? "error" : "success",
+        output: res.output,
+        error: res.error || "",
+        roomId: roomId,
+      });
     } catch (error) {
+      const executionTime = Math.round(performance.now() - startTime);
+
       console.error("Error running code:", error);
       setErrorContent(`Error: ${error.message}`);
       setTerminalTab("error");
       setTerminalVisible(true);
+
+      // ✅ TRACK FAILED EXECUTION IN KAFKA
+      await trackCodeExecution({
+        fileName: activeFile.name,
+        language: activeFile.language,
+        executionTime: executionTime,
+        status: "error",
+        output: "",
+        error: error.message,
+        roomId: roomId,
+      });
     }
   };
 
@@ -636,6 +806,8 @@ const CodeIDE = () => {
   // ============================================
 
   const handleDeleteFile = (fileId) => {
+    const fileToDelete = files.find((f) => f.id === fileId);
+
     setFiles((prev) => prev.filter((f) => f.id !== fileId));
     setOpenFiles((prev) => prev.filter((f) => f.id !== fileId));
 
@@ -649,7 +821,16 @@ const CodeIDE = () => {
       roomId: roomId,
       username: user?.username,
       userId: user?._id,
-      fileName: files.find((f) => f.id === fileId)?.name,
+      fileName: fileToDelete?.name,
+    });
+
+    // ✅ TRACK FILE OPERATION IN KAFKA
+    trackFileOperation({
+      operation: "delete",
+      fileName: fileToDelete?.name,
+      filePath: `${fileToDelete?.folder}/${fileToDelete?.name}`,
+      language: fileToDelete?.language,
+      roomId: roomId,
     });
   };
 
@@ -1350,8 +1531,13 @@ const CodeIDE = () => {
                   key={activeFile.id}
                   value={activeFile.content}
                   onChange={handleEditorChange}
+                  onCursorChange={handleCursorChange}
+                  onEditorMount={(editor) => {
+                    editorInstanceRef.current = editor;
+                  }}
                   language={activeFile.language}
                   theme={theme}
+                  remoteCursors={remoteCursors}
                 />
               </div>
             ) : (

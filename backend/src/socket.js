@@ -420,6 +420,20 @@ const initSocket = (httpServer) => {
       });
     });
 
+    // Real-time cursor position tracking
+    socket.on("cursorMove", ({ fileId, roomId, cursorPosition }) => {
+      if (!cursorPosition) return;
+
+      // Broadcast cursor position to all other users in the room
+      socket.to(roomId).emit("remoteCursorMoved", {
+        fileId,
+        socketId: socket.id,
+        username: socket.username,
+        cursorPosition,
+        timestamp: new Date(),
+      });
+    });
+
     socket.on("disconnect", async () => {
       rooms.forEach(async (room, roomId) => {
         const user = room.users.find((u) => u.socketId === socket.id);

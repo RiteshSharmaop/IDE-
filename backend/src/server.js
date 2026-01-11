@@ -15,6 +15,7 @@ const fileRoutes = require("./routes/files");
 const executeRoutes = require("./routes/execute");
 const { roomRouter } = require("./routes/room");
 const notificationRoutes = require("./routes/notifications");
+const ideRoutes = require("./routes/ide");
 
 // Create Express app and HTTP server
 const app = express();
@@ -50,6 +51,7 @@ app.use("/api/files", fileRoutes);
 app.use("/api/execute", executeRoutes);
 app.use("/api/rooms", roomRouter);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/ide", ideRoutes);
 
 // Health check route
 app.get("/api/health", (req, res) => {
