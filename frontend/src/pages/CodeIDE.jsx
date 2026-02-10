@@ -92,7 +92,7 @@ const CodeIDE = () => {
   const [terminalTab, setTerminalTab] = useState("terminal");
   const [terminalInput, setTerminalInput] = useState("");
   const [terminalOutput, setTerminalOutput] = useState(
-    "Welcome to Code IDE Terminal\n"
+    "Welcome to Code IDE Terminal\n",
   );
   const [outputContent, setOutputContent] = useState("");
   const [errorContent, setErrorContent] = useState("");
@@ -304,12 +304,12 @@ const CodeIDE = () => {
 
         // Update the file content in files array
         setFiles((prevFiles) =>
-          prevFiles.map((f) => (f.id === fileId ? { ...f, content } : f))
+          prevFiles.map((f) => (f.id === fileId ? { ...f, content } : f)),
         );
 
         // Update open files
         setOpenFiles((prevOpen) =>
-          prevOpen.map((f) => (f.id === fileId ? { ...f, content } : f))
+          prevOpen.map((f) => (f.id === fileId ? { ...f, content } : f)),
         );
 
         // Update active file if it's the one being edited
@@ -324,7 +324,7 @@ const CodeIDE = () => {
         setTimeout(() => {
           isRemoteChange.current = false;
         }, 100);
-      }
+      },
     );
 
     socket.on("userLeft", ({ username }) => {});
@@ -354,12 +354,12 @@ const CodeIDE = () => {
               "✅ Cursor updated for",
               username,
               "total cursors:",
-              updated.size
+              updated.size,
             );
             return updated;
           });
         }
-      }
+      },
     );
 
     return () => {
@@ -528,6 +528,19 @@ const CodeIDE = () => {
     });
   }, [files]);
 
+  // Insert AI-generated code into the editor
+  const handleInsertAICode = (code) => {
+    if (!activeFile) return;
+
+    // Replace the entire file content with the AI-generated code
+    const updatedFile = { ...activeFile, content: code };
+    setActiveFile(updatedFile);
+    setFiles(files.map((f) => (f.id === activeFile.id ? updatedFile : f)));
+    setOpenFiles(
+      openFiles.map((f) => (f.id === activeFile.id ? updatedFile : f)),
+    );
+  };
+
   // 🔥🔥🔥 REAL-TIME CODE CHANGE HANDLER 🔥🔥🔥
   const handleEditorChange = (value) => {
     // Don't emit if this change came from a remote user
@@ -541,7 +554,7 @@ const CodeIDE = () => {
     setActiveFile(updatedFile);
     setFiles(files.map((f) => (f.id === activeFile.id ? updatedFile : f)));
     setOpenFiles(
-      openFiles.map((f) => (f.id === activeFile.id ? updatedFile : f))
+      openFiles.map((f) => (f.id === activeFile.id ? updatedFile : f)),
     );
 
     // Emit cursor position immediately when typing (cursor moves as you type)
@@ -659,7 +672,7 @@ const CodeIDE = () => {
 
       setFiles((prevFiles) => {
         const alreadyExists = prevFiles.some(
-          (f) => f.name === newFileName && f.folder === selectedFolder
+          (f) => f.name === newFileName && f.folder === selectedFolder,
         );
 
         if (alreadyExists) {
@@ -749,7 +762,7 @@ const CodeIDE = () => {
       const res = await runTheCode(
         activeFile.language,
         activeFile.content,
-        input
+        input,
       );
 
       const executionTime = Math.round(performance.now() - startTime);
@@ -969,7 +982,7 @@ const CodeIDE = () => {
         setTerminalOutput("");
       } else if (cmd === "ls") {
         setTerminalOutput(
-          (prev) => prev + files.map((f) => f.name).join("  ") + "\n"
+          (prev) => prev + files.map((f) => f.name).join("  ") + "\n",
         );
       } else {
         setTerminalOutput((prev) => prev + `Command executed: ${cmd}\n`);
@@ -1121,7 +1134,7 @@ const CodeIDE = () => {
                                 className="w-2 h-2 rounded-full"
                                 style={{
                                   backgroundColor: getLanguageColor(
-                                    file.language
+                                    file.language,
                                   ),
                                 }}
                               />
@@ -1956,7 +1969,12 @@ const CodeIDE = () => {
         )}
       </div>
       {/* // In your CodeIDE component, add this before the closing div: */}
-      <AIAssistantSidebar theme={theme} activeFile={activeFile} />
+      <AIAssistantSidebar
+        theme={theme}
+        activeFile={activeFile}
+        fileContent={activeFile?.content}
+        onInsertCode={handleInsertAICode}
+      />
 
       {!sidebarCollapsed && showNotifications && (
         <div
@@ -1981,7 +1999,7 @@ const CodeIDE = () => {
                     const ok = window.confirm(
                       `Delete ${selected} selected notification${
                         selected > 1 ? "s" : ""
-                      }?`
+                      }?`,
                     );
                     if (!ok) return;
                     api.deleteSelected();

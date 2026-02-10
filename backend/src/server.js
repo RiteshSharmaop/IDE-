@@ -16,6 +16,7 @@ const executeRoutes = require("./routes/execute");
 const { roomRouter } = require("./routes/room");
 const notificationRoutes = require("./routes/notifications");
 const ideRoutes = require("./routes/ide");
+const aiRoutes = require("./routes/ai");
 
 // Create Express app and HTTP server
 const app = express();
@@ -31,7 +32,7 @@ app.use(
   cors({
     origin: process.env.CLIENT_URL,
     credentials: true,
-  })
+  }),
 );
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
@@ -52,6 +53,7 @@ app.use("/api/execute", executeRoutes);
 app.use("/api/rooms", roomRouter);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/ide", ideRoutes);
+app.use("/api/ai", aiRoutes);
 
 // Health check route
 app.get("/api/health", (req, res) => {
