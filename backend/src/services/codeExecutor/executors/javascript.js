@@ -15,8 +15,9 @@ exports.runJavascriptCode = async (code, input = "") => {
   fs.writeFileSync(localTempFile, code);
 
   try {
-    // write code into container /tmp using here-doc to preserve content
-    const writeCmd = `docker exec -i ${containerName} bash -c "cat > ${containerTempFile} <<'EOF'\n${code}\nEOF"`;
+    // write code into container using base64 encoding to preserve all characters including quotes
+    const encodedCode = Buffer.from(code).toString('base64');
+    const writeCmd = `docker exec -i ${containerName} bash -c "echo '${encodedCode}' | base64 -d > ${containerTempFile}"`;
     await execPromise(writeCmd, { timeout: 5000, maxBuffer: 1024 * 1024 });
 
     // prepare execute command, piping input if provided
