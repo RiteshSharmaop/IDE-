@@ -2,6 +2,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { cacheUser, invalidateUserCache, blacklistToken } = require('../config/redis');
+const emailService = require('../services/emailService');
 
 /**
  * Generate JWT token
@@ -30,6 +31,22 @@ const signup = async (req, res) => {
       });
     }
 
+    // Validate username format early to avoid creating invalid documents
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username can only contain letters, numbers, and underscores'
+      });
+    }
+
+    // Validate Gmail account
+    if (!email.toLowerCase().endsWith('@gmail.com')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Only Gmail accounts are supported for registration'
+      });
+    }
+
     // Check if user already exists
     const existingUser = await User.findOne({
       $or: [{ email }, { username }]
@@ -44,34 +61,45 @@ const signup = async (req, res) => {
       });
     }
 
-    // Create user
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // OTP valid for 10 minutes
+
+    // Create user with OTP
     const user = await User.create({
       username,
       email,
-      password
+      password,
+      otp,
+      otpExpiry,
+      isEmailVerified: false
     });
 
-    // Generate token
-    const token = generateToken(user._id);
+    // Send OTP email and handle send result
+    const emailResult = await emailService.sendOTPEmail(email, otp, username);
 
-    // Cache user data
-    await cacheUser(user._id.toString(), user.toJSON());
+    if (emailService && emailService.isConfigured) {
+      // SMTP configured in environment: require successful send
+      if (!emailResult || !emailResult.success) {
+        console.error(`❌ Failed to send OTP to ${email} while email service is configured. Error: ${emailResult && emailResult.message ? emailResult.message : 'unknown'}`);
+        // Do NOT delete the created user here to avoid accidental data loss; keep the account and let admin/developer fix SMTP and use /api/auth/resend-otp
+        return res.status(500).json({
+          success: false,
+          message: `Failed to send OTP: ${emailResult && emailResult.message ? emailResult.message : 'Unknown error'}. Ensure EMAIL_USER and EMAIL_PASSWORD (Gmail App Password) are set correctly.`
+        });
+      }
+    }
 
-    // Update last login
-    user.lastLogin = new Date();
-    await user.save();
-
+    // On development or when email isn't configured, continue but expose testOTP only in dev
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
+      message: 'User registered successfully. Please check your email for OTP.',
       data: {
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          createdAt: user.createdAt
-        },
-        token
+        userId: user._id,
+        email: user.email,
+        username: user.username,
+        message: 'Please verify your email with the 6-digit OTP sent to your Gmail',
+        testOTP: process.env.NODE_ENV === 'development' ? otp : undefined
       }
     });
   } catch (error) {
@@ -102,8 +130,6 @@ const signin = async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    
-
     // Validation
     if (!email || !password) {
       return res.status(400).json({
@@ -121,7 +147,14 @@ const signin = async (req, res) => {
         message: 'Invalid credentials'
       });
     }
-    console.log("Worked");
+
+    // Check if email is verified
+    if (!user.isEmailVerified) {
+      return res.status(403).json({
+        success: false,
+        message: 'Please verify your email first. OTP was sent to your registered Gmail.'
+      });
+    }
 
     // Check if account is active
     if (!user.isActive) {
@@ -301,10 +334,174 @@ const updatePassword = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Verify OTP and complete email verification
+ * @route   POST /api/auth/verify-otp
+ * @access  Public
+ */
+const verifyOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    // Validation
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email and OTP'
+      });
+    }
+
+    // Find user with OTP
+    const user = await User.findOne({ email }).select('+otp +otpExpiry');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if OTP exists
+    if (!user.otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'OTP not found. Please sign up again.'
+      });
+    }
+
+    // Check if OTP is expired
+    if (new Date() > user.otpExpiry) {
+      user.otp = undefined;
+      user.otpExpiry = undefined;
+      await user.save();
+      return res.status(400).json({
+        success: false,
+        message: 'OTP has expired. Please sign up again.'
+      });
+    }
+
+    // Verify OTP
+    if (user.otp !== otp.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid OTP. Please try again.'
+      });
+    }
+
+    // Mark email as verified and clear OTP
+    user.isEmailVerified = true;
+    user.otp = undefined;
+    user.otpExpiry = undefined;
+    await user.save();
+
+    // Generate token
+    const token = generateToken(user._id);
+
+    // Cache user data
+    const userObj = user.toObject();
+    delete userObj.password;
+    await cacheUser(user._id.toString(), userObj);
+
+    res.status(200).json({
+      success: true,
+      message: 'Email verified successfully',
+      data: {
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          isEmailVerified: user.isEmailVerified
+        },
+        token
+      }
+    });
+  } catch (error) {
+    console.error('OTP verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during OTP verification'
+    });
+  }
+};
+
+/**
+ * @desc    Resend OTP to user email
+ * @route   POST /api/auth/resend-otp
+ * @access  Public
+ */
+const resendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email'
+      });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is already verified'
+      });
+    }
+
+    // Generate new OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+
+    user.otp = otp;
+    user.otpExpiry = otpExpiry;
+    await user.save();
+
+    // Send OTP email
+    const emailResult = await emailService.sendOTPEmail(email, otp, user.username);
+
+    if (emailService && emailService.isConfigured) {
+      if (!emailResult || !emailResult.success) {
+        console.error(`❌ Failed to resend OTP to ${email}. Error: ${emailResult && emailResult.message ? emailResult.message : 'unknown'}`);
+        return res.status(500).json({
+          success: false,
+          message: `Failed to send OTP: ${emailResult && emailResult.message ? emailResult.message : 'Unknown error'}. Check EMAIL credentials.`
+        });
+      }
+    } else {
+      if (!emailResult || !emailResult.success) {
+        console.warn(`⚠️  Email not sent to ${email}, but OTP regenerated: ${otp}`);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP resent successfully',
+      // For development/testing without email:
+      testOTP: process.env.NODE_ENV === 'development' ? otp : undefined
+    });
+  } catch (error) {
+    console.error('Resend OTP error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during OTP resend'
+    });
+  }
+};
+
 module.exports = {
   signup,
   signin,
   getMe,
   logout,
-  updatePassword
+  updatePassword,
+  verifyOTP,
+  resendOTP
 };

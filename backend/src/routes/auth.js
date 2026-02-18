@@ -6,13 +6,17 @@ const {
   signin,
   getMe,
   logout,
-  updatePassword
+  updatePassword,
+  verifyOTP,
+  resendOTP
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
 // Public routes
 router.post('/signup', signup);
 router.post('/signin', signin);
+router.post('/verify-otp', verifyOTP);
+router.post('/resend-otp', resendOTP);
 
 // Protected routes
 router.get('/me', protect, getMe);

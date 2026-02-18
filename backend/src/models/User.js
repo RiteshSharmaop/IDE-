@@ -40,6 +40,18 @@ const userSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  isEmailVerified: {
+    type: Boolean,
+    default: false
+  },
+  otp: {
+    type: String,
+    select: false // Don't return OTP by default
+  },
+  otpExpiry: {
+    type: Date,
+    select: false
   }
 }, {
   timestamps: true

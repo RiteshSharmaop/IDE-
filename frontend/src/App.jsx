@@ -2,6 +2,7 @@ import CodeIDE from "./pages/CodeIDE";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import OTPVerification from "./pages/OTPVerification";
 import { Routes, Route } from "react-router-dom";
 import StartingPage from "./pages/StartingPage";
 import { ProtectedRoute } from "./lib/auth";
@@ -17,6 +18,7 @@ function App() {
          <Route path="/test" element={<IDE2 />} /> */}
         <Route path="/" element={<StartingPage />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/verify-otp" element={<OTPVerification />} />
         <Route path="/signin" element={<Login />} />
         <Route
           path="/e/:roomId"

@@ -57,23 +57,6 @@ export function SignupCard() {
     };
   }, [socket]);
 
-  const joinRoom = async (roomId) => {
-    // Join the room via socket (include user info from localStorage if available)
-    const cached = localStorage.getItem("user");
-    let userObj = null;
-    try {
-      userObj = cached ? JSON.parse(cached) : null;
-    } catch {}
-
-    const payload = {
-      roomId,
-      username: userObj?.username,
-      userId: userObj?._id || userObj?.id,
-    };
-
-    socket.emit("joinRoom", payload);
-    console.log("Joined Room", payload);
-  };
   const handleSignup = async (e) => {
     e?.preventDefault();
     setLoading(true);
@@ -84,16 +67,16 @@ export function SignupCard() {
         email,
         password,
       });
-      const createdRoomId = crypto.randomUUID();
 
       if (res?.data?.success) {
-        const token = res.data.data?.token;
-        const user = res.data.data?.user;
-        if (token) signin(token, user);
-        await joinRoom(createdRoomId);
-        setRoomId(createdRoomId);
-
-        navigate(`/e/${createdRoomId}`);
+        // Store email for OTP verification
+        localStorage.setItem("signupEmail", email);
+        
+        // Show success message and redirect to OTP verification
+        setError(null);
+        setTimeout(() => {
+          navigate("/verify-otp", { state: { email } });
+        }, 500);
       } else {
         setError(res?.data?.message || "Signup failed");
       }

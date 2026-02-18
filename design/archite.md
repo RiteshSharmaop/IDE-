@@ -1,4 +1,5 @@
-graph TD
+``` mermaid
+    graph TD
     Start([User Visits /signup]) --> InputForm["Enter: Username, Gmail, Password"]
     InputForm --> ClickSignup["Click 'Sign Up' Button"]
     ClickSignup --> API1["POST /api/auth/signup"]
@@ -68,3 +69,4 @@ graph TD
     style API1 fill:#34495e,stroke:#2c3e50,color:#fff
     style API2 fill:#34495e,stroke:#2c3e50,color:#fff
     style API3 fill:#34495e,stroke:#2c3e50,color:#fff
+```
