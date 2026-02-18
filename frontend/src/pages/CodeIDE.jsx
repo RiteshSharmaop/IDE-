@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 
 import { MonacoEditor } from "../components/Editor/MonacoEditor";
-import { runTheCode } from "../lib/codeExecute";
+import { runTheCode } from "../lib/codeExecute.js";
 import {
   trackCodeExecution,
   trackFileOperation,
@@ -644,6 +644,47 @@ const CodeIDE = () => {
         cursorPosition,
       });
     }, 100); // 100ms debounce for optimization
+  };
+
+  // Insert code from AI Assistant into the editor
+  const handleInsertCode = (code, language) => {
+    if (!activeFile) {
+      alert('Please select a file first');
+      return;
+    }
+
+    // If language doesn't match, optionally warn the user
+    if (activeFile.language !== language) {
+      console.warn(`Language mismatch: File is ${activeFile.language}, code is ${language}`);
+    }
+
+    const currentContent = activeFile.content;
+    
+    // Insert at cursor position if editor is focused
+    if (editorInstanceRef.current) {
+      const position = editorInstanceRef.current.getPosition();
+      if (position) {
+        // Get content before and after cursor
+        const lines = currentContent.split('\n');
+        const beforeLines = lines.slice(0, position.lineNumber - 1);
+        const afterLines = lines.slice(position.lineNumber - 1);
+        
+        const newContent = [
+          ...beforeLines,
+          code,
+          ...afterLines
+        ].join('\n');
+        
+        handleEditorChange(newContent);
+        
+        // Focus editor and position cursor
+        editorInstanceRef.current.focus();
+      }
+    } else {
+      // If no editor focus, append to the end
+      const newContent = currentContent ? currentContent + '\n\n' + code : code;
+      handleEditorChange(newContent);
+    }
   };
 
   // .................................................................................
@@ -1956,7 +1997,7 @@ const CodeIDE = () => {
         )}
       </div>
       {/* // In your CodeIDE component, add this before the closing div: */}
-      <AIAssistantSidebar theme={theme} activeFile={activeFile} />
+      <AIAssistantSidebar theme={theme} activeFile={activeFile} onInsertCode={handleInsertCode} />
 
       {!sidebarCollapsed && showNotifications && (
         <div

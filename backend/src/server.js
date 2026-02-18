@@ -16,6 +16,7 @@ const executeRoutes = require("./routes/execute");
 const { roomRouter } = require("./routes/room");
 const notificationRoutes = require("./routes/notifications");
 const ideRoutes = require("./routes/ide");
+const llmRoutes = require("./routes/llm");
 
 // Create Express app and HTTP server
 const app = express();
@@ -29,7 +30,7 @@ connectRedis();
 app.use(helmet());
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
     credentials: true,
   })
 );
@@ -52,11 +53,12 @@ app.use("/api/execute", executeRoutes);
 app.use("/api/rooms", roomRouter);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/ide", ideRoutes);
+app.use("/api/llm", llmRoutes);
 
 // Health check route
 app.get("/api/health", (req, res) => {
   res.status(200).json({
-    status: "IDE server is healthy and running",
+    status: "IDE server is healthy and running smoothly!",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });

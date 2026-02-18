@@ -1,10 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, Send, MessageCircle, X } from 'lucide-react';
+import MessageRenderer from './MessageRenderer';
+import { askAI } from '../lib/llmApi';
 
-const AIAssistantSidebar = ({ theme = 'dark', activeFile = null }) => {
+const AIAssistantSidebar = ({ theme = 'dark', activeFile = null, onInsertCode = null }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { id: 1, type: 'bot', text: 'Hello! I can help you understand your code. Ask me anything about the current file or how to modify it.' }
+    { 
+      id: 1, 
+      type: 'bot', 
+      text: 'Hello! 👋 I can help you with your code. Ask me anything about the current file, how to debug issues, or request code modifications.' 
+    }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -42,7 +48,13 @@ const AIAssistantSidebar = ({ theme = 'dark', activeFile = null }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSendMessage = () => {
+  const handleInsertCode = (code, language) => {
+    if (onInsertCode) {
+      onInsertCode(code, language);
+    }
+  };
+
+  const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
 
     // Add user message
@@ -53,19 +65,43 @@ const AIAssistantSidebar = ({ theme = 'dark', activeFile = null }) => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const question = inputValue;
     setInputValue('');
     setIsLoading(true);
 
-    // Simulate bot response delay
-    setTimeout(() => {
-      const botMessage = {
+    try {
+      const response = await askAI(
+        question,
+        activeFile?.content || '',
+        activeFile?.language || 'javascript'
+      );
+
+      if (response.success) {
+        const botMessage = {
+          id: messages.length + 2,
+          type: 'bot',
+          text: response.answer
+        };
+        setMessages(prev => [...prev, botMessage]);
+      } else {
+        const errorMessage = {
+          id: messages.length + 2,
+          type: 'bot',
+          text: `Sorry, I couldn't process your request: ${response.message}`
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage = {
         id: messages.length + 2,
         type: 'bot',
-        text: `I understand you asked: "${inputValue}". Based on the current file "${activeFile?.name || 'No file selected'}", I can help you with code modifications. In a real implementation, this would connect to an AI service that analyzes your code and provides intelligent responses.`
+        text: error.response?.data?.message || 'Error: Unable to get response. Make sure the OpenRouter API key is configured.'
       };
-      setMessages(prev => [...prev, botMessage]);
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 800);
+    }
   };
 
   const handleKeyPress = (e) => {
@@ -150,14 +186,22 @@ const AIAssistantSidebar = ({ theme = 'dark', activeFile = null }) => {
                   className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className="px-4 py-2 rounded-lg max-w-xs text-sm leading-relaxed"
+                    className="px-4 py-2 rounded-lg max-w-xs text-sm"
                     style={{
                       backgroundColor: msg.type === 'user' ? c.accent : c.bgTertiary,
                       color: msg.type === 'user' ? (theme === 'dark' ? '#1E1E1E' : '#FFFFFF') : c.text,
                       wordBreak: 'break-word'
                     }}
                   >
-                    {msg.text}
+                    {msg.type === 'user' ? (
+                      msg.text
+                    ) : (
+                      <MessageRenderer 
+                        content={msg.text} 
+                        theme={theme}
+                        onInsertCode={handleInsertCode}
+                      />
+                    )}
                   </div>
                 </div>
               ))}
