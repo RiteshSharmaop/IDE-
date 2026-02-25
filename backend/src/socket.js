@@ -353,6 +353,27 @@ const initSocket = (httpServer) => {
       }
     );
 
+    // Saved Code event - broadcast saved code info to room
+    socket.on("savedCode", ({ file, roomId, username, userId }) => {
+      try {
+        // Optionally persist to room.files if not present
+        const room = getOrCreateRoom(roomId);
+        if (file && file.id && !room.files.find((f) => f.id === file.id)) {
+          room.files.push(file);
+        }
+
+        io.to(roomId).emit("savedCode", {
+          file,
+          username,
+          userId,
+          socketId: socket.id,
+          timestamp: new Date(),
+        });
+      } catch (e) {
+        console.error("Error handling savedCode event:", e);
+      }
+    });
+
     socket.on(
       "executeCode",
       ({ fileName, fileId, language, output, error, roomId, username }) => {

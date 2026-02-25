@@ -31,8 +31,11 @@ exports.runJavaCode = async (code, input = "") => {
 		}
 
 		// Execute program, piping input if present
-		const sanitizedInput = input.replace(/'/g, "'\\''");
-		const executeCmd = `docker exec -i ${containerName} bash -c \"echo '${sanitizedInput}' | ${commands.execute}\"`;
+		const trimmedInput = input || "";
+		const inputB64 = Buffer.from(trimmedInput, 'utf8').toString('base64');
+		const executeCmd = trimmedInput
+			? `docker exec -i ${containerName} bash -c \"echo '${inputB64}' | base64 -d | ${commands.execute}\"`
+			: `docker exec -i ${containerName} bash -c \"${commands.execute}\"`;
 
 		const { stdout, stderr } = await execPromise(executeCmd, {
 			timeout: timeout,

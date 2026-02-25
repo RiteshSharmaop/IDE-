@@ -33,6 +33,7 @@ import {
 
 import { MonacoEditor } from "../components/Editor/MonacoEditor";
 import { runTheCode } from "../lib/codeExecute.js";
+import { apiClient } from "../lib/api";
 import {
   trackCodeExecution,
   trackFileOperation,
@@ -40,6 +41,7 @@ import {
 } from "../lib/kafkaTracking";
 import { useAuth } from "../lib/auth";
 import { useSocket } from "../context/SocketContext";
+import { useTheme } from "../context/ThemeContext";
 import { Link, useNavigate } from "react-router-dom";
 import { useRoom } from "../context/RoomContext";
 import { useRef } from "react";
@@ -48,15 +50,17 @@ import { Empty } from "../components/ui/empty";
 import ShareDialog from "../components/ShareDialog";
 import CheckboxInTable from "../components/CheckboxInTable";
 import RoomsSidebar from "../components/RoomsSidebar";
+import UserProfile from "../components/UserProfile";
 import {
   getUserRooms,
   createUserRoom,
   deleteUserRoom,
   saveFileToRoom,
 } from "../lib/roomApi";
+import AccountPage from "../components/UserProfile";
 
 const CodeIDE = () => {
-  const [theme, setTheme] = useState("dark");
+  const { theme, setTheme } = useTheme();
   const [files, setFiles] = useState([
     {
       id: 1,
@@ -112,6 +116,10 @@ const CodeIDE = () => {
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [userFiles, setUserFiles] = useState([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [remoteCursors, setRemoteCursors] = useState(new Map()); // Track remote user cursors
 
   const navigate = useNavigate();
@@ -123,6 +131,7 @@ const CodeIDE = () => {
   //   plan: 'Free'
   // };
   const { user, signout } = useAuth();
+  const { setUser } = useAuth();
 
   // DEBUG: Log user availability
   useEffect(() => {
@@ -433,6 +442,8 @@ const CodeIDE = () => {
     });
   };
 
+  
+
   const handleFileChanged = ({ fileId, editorId }) => {
     const changedFile = files.find((f) => f.id === fileId);
 
@@ -689,6 +700,12 @@ const CodeIDE = () => {
 
   // .................................................................................
   const handleCreateFile = () => {
+    // Enforce free-user file creation limit: 5 files
+    if (user && String(user.plan || '').toLowerCase() !== "premium" && files.length >= 5) {
+      alert("Free users can create up to 5 files. Upgrade to premium for more.");
+      return;
+    }
+
     if (newFileName.trim()) {
       const newFile = {
         id: Date.now(),
@@ -743,6 +760,99 @@ const CodeIDE = () => {
 
       setNewFileName("");
       setIsCreatingFile(false);
+    }
+  };
+
+  // Save active file to backend (Redis) endpoint
+  const saveActiveFile = async () => {
+    if (!activeFile) {
+      alert("No active file to save");
+      return;
+    }
+    try {
+      setIsSaving(true);
+      const payload = {
+        file: activeFile,
+      };
+      const res = await apiClient.post("/files/save-redis", payload);
+      if (res?.data?.success) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2000);
+        try {
+          const name = activeFile?.name || "file";
+          alert(`Saved ${name}`);
+        } catch (e) {
+          console.debug("Alert failed:", e);
+        }
+
+        // Build a serializable file payload to emit
+        const filePayload = {
+          id: activeFile.id,
+          name: activeFile.name,
+          content: activeFile.content,
+          language: activeFile.language,
+          folder: activeFile.folder,
+          createdAt: new Date().toISOString(),
+        };
+
+        console.debug("Save response:", res?.data, "emitting savedCode with:", filePayload, "roomId:", roomId);
+
+        // Notify other users in the room that this file was saved
+        try {
+          if (socket && socket.connected) {
+            socket.emit("savedCode", {
+              file: filePayload,
+              roomId: roomId,
+              username: user?.username,
+              userId: user?._id,
+            });
+          } else {
+            console.warn("Socket not connected, cannot emit savedCode");
+          }
+        } catch (e) {
+          console.debug("Failed to emit savedCode event:", e);
+        }
+      } else {
+        alert("Failed to save file");
+      }
+    } catch (err) {
+      console.error("Save failed:", err);
+      alert("Save failed");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const loadUserFiles = async () => {
+    try {
+      const res = await apiClient.get("/files");
+      if (res?.data?.success) {
+        setUserFiles(res.data.data || []);
+      }
+    } catch (err) {
+      console.error("Failed loading user files:", err);
+    }
+  };
+
+  const uploadAvatar = async (file) => {
+    if (!file) return;
+    try {
+      const fd = new FormData();
+      fd.append("avatar", file);
+      const res = await apiClient.post("/users/avatar", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      if (res?.data?.success) {
+        const updated = { ...user, avatar: res.data.data.url };
+        setUser(updated);
+        localStorage.setItem("user", JSON.stringify(updated));
+        alert("Avatar updated");
+      } else {
+        alert("Failed to upload avatar");
+      }
+    } catch (err) {
+      console.error("Avatar upload failed:", err);
+      alert("Avatar upload failed");
     }
   };
 
@@ -919,8 +1029,19 @@ const CodeIDE = () => {
     }
   }, [files]);
 
-  const handleCloseFile = (fileId, e) => {
-    e?.stopPropagation();
+  const handleCloseFile = (fileId) => {
+    // Update local UI: remove from open files and pick a sensible active file
+    setOpenFiles((prev) => {
+      const newOpen = prev.filter((f) => f.id !== fileId);
+      // If the closed file was active, set the active file to the last open file (or null)
+      if (activeFile?.id === fileId) {
+        const newActive = newOpen.length ? newOpen[newOpen.length - 1] : null;
+        setActiveFile(newActive);
+      }
+      return newOpen;
+    });
+
+    // Notify other collaborators
     socket.emit("closeFile", fileId, roomId);
   };
 
@@ -1361,6 +1482,7 @@ const CodeIDE = () => {
                           backgroundColor: "transparent",
                           color: c.text,
                         }}
+                        onClick={saveActiveFile}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.backgroundColor = c.bgTertiary;
                         }}
@@ -1370,6 +1492,45 @@ const CodeIDE = () => {
                       >
                         <CreditCard size={16} />
                         <span className="text-sm">Billing</span>
+                      </button>
+
+                      <button
+                        className="w-full flex items-center gap-3 px-4 py-2.5 transition-all"
+                        style={{ backgroundColor: "transparent", color: c.text }}
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          // Navigate to profile page instead of opening modal
+                          navigate('/profile');
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = c.bgTertiary;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        <User size={16} />
+                        <span className="text-sm">Profile</span>
+                      </button>
+
+                      <button
+                        className="w-full flex items-center gap-3 px-4 py-2.5 transition-all"
+                        style={{ backgroundColor: "transparent", color: c.text }}
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          saveActiveFile();
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = c.bgTertiary;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        <Save size={16} />
+                        <span className="text-sm">Save Current File</span>
+                        {isSaving && <span className="text-xs ml-auto">Saving...</span>}
+                        {saveSuccess && <span className="text-xs ml-auto">Saved</span>}
                       </button>
 
                       <button
@@ -1405,6 +1566,29 @@ const CodeIDE = () => {
                         onMouseLeave={(e) => {
                           e.currentTarget.style.backgroundColor = "transparent";
                         }}
+                      >
+                        <Save size={16} />
+                        <span className="text-sm">Save</span>
+                        {isSaving ? (
+                          <span className="ml-auto text-xs text-amber-400">Saving...</span>
+                        ) : saveSuccess ? (
+                          <span className="ml-auto text-xs text-emerald-400">Saved</span>
+                        ) : null}
+                      </button>
+
+                      <button
+                        className="w-full flex items-center gap-3 px-4 py-2.5 transition-all"
+                        style={{
+                          backgroundColor: "transparent",
+                          color: c.text,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = c.bgTertiary;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                        
                       >
                         <Settings size={16} />
                         <span className="text-sm">Settings</span>
@@ -1448,10 +1632,10 @@ const CodeIDE = () => {
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top Bar */}
           <header
-            className="flex items-center justify-between px-6 py-3 border-b"
+            className="flex items-center justify-between px-1 h-16  border-b"
             style={{ backgroundColor: c.bgSecondary, borderColor: c.border }}
           >
-            <div className="flex items-center gap-4">
+            {/* <div className="flex items-center gap-4">
               {activeFile && (
                 <div className="flex items-center gap-2">
                   <div
@@ -1514,11 +1698,102 @@ const CodeIDE = () => {
               >
                 <Share2 size={18} />
               </button>
-            </div>
+            </div> */}
+
+
+
+            
+  {/* LEFT SIDE - TABS */}
+  <div
+    onWheel={(e) => {
+      e.currentTarget.scrollLeft += e.deltaY;
+    }}
+    className="flex items-center gap-1 px-4 py-2 
+               overflow-x-auto overflow-y-hidden 
+               scroll-smooth flex-1 min-w-0 rounded-tl-lg "
+  >
+    {openFiles.map((file) => (
+      <button
+        key={file.id}
+        onClick={() => handleFileTabs(file)}
+        className="flex items-center gap-2 px-4 py-2 
+                   rounded-t-lg transition-all 
+                   relative group whitespace-nowrap flex-shrink-0"
+        style={{
+          backgroundColor:
+            activeFile?.id === file.id ? c.bg : "transparent",
+          color:
+            activeFile?.id === file.id ? c.accent : c.textMuted,
+          borderBottom:
+            activeFile?.id === file.id
+              ? `2px solid ${c.accent}`
+              : "none",
+        }}
+      >
+        <div
+          className="w-2 h-2 rounded-full"
+          style={{ backgroundColor: getLanguageColor(file.language) }}
+        />
+        <span className="text-sm">{file.name}</span>
+        <span
+                    onClick={(e) => {
+                      e.stopPropagation(); // ⛔ prevent tab click
+                      handleCloseFile(file.id);
+                    }}
+                    className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity
+               hover:bg-red-500 hover:bg-opacity-20 rounded p-0.5 cursor-pointer"
+                  >
+                    <X size={14} />
+                  </span>
+      </button>
+    ))}
+  </div>
+
+  {/* RIGHT SIDE - BUTTONS */}
+  <div className="flex items-center gap-3 px-4 flex-shrink-0">
+    <button
+      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+      className="p-2 rounded-lg transition-all hover:opacity-80"
+      style={{ backgroundColor: c.bgTertiary }}
+    >
+      {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+    </button>
+
+    <Link
+      to="https://brainmash-1.onrender.com"
+      className="flex items-center gap-2 px-4 py-2 rounded-lg transition-all hover:opacity-70"
+      style={{ backgroundColor: c.bgTertiary }}
+    >
+      <Brain size={16} />
+      <span className="text-sm font-medium">BrainMesh</span>
+    </Link>
+
+    <button
+      onClick={handleRunCode}
+      disabled={!activeFile}
+      className="flex items-center gap-2 px-4 py-2 rounded-lg transition-all hover:opacity-70 disabled:opacity-40"
+      style={{
+        backgroundColor: c.accent,
+        color: theme === "dark" ? c.bg : "#FFFFFF",
+      }}
+    >
+      <Play size={16} />
+      <span className="text-sm font-medium">Run</span>
+    </button>
+
+    <button
+      onClick={handleShareButton}
+      className="p-2 rounded-lg transition-all hover:opacity-80"
+      style={{ backgroundColor: c.bgTertiary }}
+    >
+      <Share2 size={18} />
+    </button>
+</div>
+
           </header>
 
           {/* File Tabs */}
-          {openFiles.length > 0 && (
+          {/* {openFiles.length > 0 && (
             <div
               className="flex items-center gap-1 px-4 py-2 overflow-x-auto border-b"
               style={{ backgroundColor: c.bgSecondary, borderColor: c.border }}
@@ -1545,7 +1820,7 @@ const CodeIDE = () => {
 
                   <span className="text-sm">{file.name}</span>
 
-                  {/* ✅ NOT A BUTTON */}
+                  
                   <span
                     onClick={(e) => {
                       e.stopPropagation(); // ⛔ prevent tab click
@@ -1559,7 +1834,7 @@ const CodeIDE = () => {
                 </button>
               ))}
             </div>
-          )}
+          )} */}
 
           {/* Editor Area */}
           <div
@@ -1567,7 +1842,7 @@ const CodeIDE = () => {
             style={{ backgroundColor: c.bg }}
           >
             {activeFile ? (
-              <div className="h-full p-6">
+              <div className="h-full pt-1">
                 <MonacoEditor
                   key={activeFile.id}
                   value={activeFile.content}
@@ -1829,6 +2104,18 @@ const CodeIDE = () => {
               </div>
             </div>
           </>
+        )}
+        {showProfileModal && (
+          // <AccountPage
+          //   UserProfile={user}
+          //   userFiles={userFiles}
+          //   rooms={rooms}
+          //   uploadAvatar={uploadAvatar}
+          //   onClose={() => setShowProfileModal(false)}
+          //   loadUserFiles={loadUserFiles}
+          //   loadUserRooms={loadUserRooms}
+          // />
+          <AccountPage user={user} roomId ={roomId} setUser={setUser} files={files} />
         )}
 
         {/* Create Folder Modal */}

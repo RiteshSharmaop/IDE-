@@ -125,3 +125,56 @@
   font-weight: 400;
   font-style: normal;
 }
+
+/* Dark horizontal scrollbar */
+/* ::-webkit-scrollbar {
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+* {
+  scrollbar-color: #3a3a3a #1e1e1e;
+} */
+
+
+
+/* Horizontal scrollbar height */
+::-webkit-scrollbar {
+  height: 3px;
+  padding:0
+}
+
+/* Remove track completely */
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Scroll thumb only */
+::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+  border-radius: 10px;
+}
+
+/* Hover effect */
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3a3a3a transparent;
+}
+

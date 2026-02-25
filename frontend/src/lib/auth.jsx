@@ -115,14 +115,45 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
+// export function ProtectedRoute({ children }) {
+//   const { user, loading } = useAuth();
+//   const navigate = useNavigate();
+
+//   if (loading) return null;
+//   if (!user?.id) {
+//     navigate("/signin");
+//     return null;
+//   }
+//   return children;
+// }
+
+
+import { Navigate } from "react-router-dom";
+
 export function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
-  const navigate = useNavigate();
 
   if (loading) return null;
+
   if (!user?.id) {
-    navigate("/signin");
-    return null;
+    return <Navigate to="/signin" replace />;
   }
+
   return children;
 }
+
+
+export function PublicRoute({ children }) {
+  const { user, loading } = useAuth();
+  const {roomId} = useRoom();
+  const roomIdFromStorage = localStorage.getItem("roomId");
+
+  if (loading) return null;
+
+  if (user?.id) {
+    return <Navigate to={`/e/${roomId || roomIdFromStorage}`} replace />;
+  }
+
+  return children;
+}
+

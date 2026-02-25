@@ -37,9 +37,34 @@ const userSchema = new mongoose.Schema({
   lastLogin: {
     type: Date
   },
+  avatar: {
+    type: String,
+    default: ''
+  },
+  plan: {
+    type: String,
+    enum: ['free', 'premium'],
+    default: 'free'
+  },
+  filesCreated: {
+    type: Number,
+    default: 0
+  },
   isActive: {
     type: Boolean,
     default: true
+  },
+  isEmailVerified: {
+    type: Boolean,
+    default: false
+  },
+  otp: {
+    type: String,
+    select: false // Don't return OTP by default
+  },
+  otpExpiry: {
+    type: Date,
+    select: false
   }
 }, {
   timestamps: true

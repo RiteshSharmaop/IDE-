@@ -43,6 +43,15 @@ exports.createFile = async (req, res) => {
     }
     const userId = req.user?.id || req.user?._id;
 
+    // Enforce free user file creation limit
+    const userDoc = await User.findById(userId).select('plan filesCreated');
+    if (userDoc && userDoc.plan !== 'premium' && (userDoc.filesCreated || 0) >= 5) {
+      return res.status(403).json({
+        success: false,
+        message: 'File creation limit reached for free users. Upgrade to premium for unlimited files.'
+      });
+    }
+
     // TODO: "Check file with name for the user is already exists or not"
     const alreadyExists = await File.findOne({
       $and: [{ name }, { userId }],
@@ -93,6 +102,82 @@ exports.createFile = async (req, res) => {
       message: "Error creating file",
       error: error.message,
     });
+  }
+};
+
+// @desc    Save file snapshot to Redis
+// @route   POST /api/files/save-redis
+exports.saveToRedis = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    const { file } = req.body;
+    console.log('💾 saveToRedis called for userId:', userId, 'file:', file?.name);
+    if (!file) {
+      return res.status(400).json({ success: false, message: 'File payload required' });
+    }
+
+    const client = getRedisClient();
+    if (!client) {
+      return res.status(503).json({ success: false, message: 'Redis not available' });
+    }
+
+    const key = `user:${userId}:snapshot:${file.name || file.id || Date.now()}`;
+    console.log('🔑 Storing snapshot at key:', key);
+    await client.setEx(key, 3600, JSON.stringify({ file, savedAt: new Date() }));
+
+    // Maintain a simple index of saved snapshots for the user
+    const indexKey = `user:${userId}:snapshots`;
+    console.log('📋 Adding to index:', indexKey);
+    await client.lPush(indexKey, key);
+    await client.expire(indexKey, 3600);
+    
+    console.log('✅ Snapshot saved successfully');
+    return res.json({ success: true, message: 'Saved to Redis', data: { key } });
+  } catch (error) {
+    console.error('❌ Save to Redis error:', error);
+    return res.status(500).json({ success: false, message: 'Error saving to Redis' });
+  }
+};
+
+// @desc    Get saved snapshots for the authenticated user from Redis
+// @route   GET /api/files/snapshots
+exports.getSnapshots = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    console.log('📥 getSnapshots called for userId:', userId);
+    const client = getRedisClient();
+    if (!client) {
+      console.error('❌ Redis client not available');
+      return res.status(503).json({ success: false, message: 'Redis not available' });
+    }
+
+    const indexKey = `user:${userId}:snapshots`;
+    console.log('🔑 Looking for snapshots at key:', indexKey);
+    // Get last 50 saved snapshot keys
+    const keys = await client.lRange(indexKey, 0, 49);
+    console.log('📋 Found', keys.length, 'snapshot keys:', keys);
+
+    const snapshots = [];
+    for (const k of keys) {
+      try {
+        const raw = await client.get(k);
+        if (!raw) {
+          console.warn('⚠️ Snapshot key exists but no data:', k);
+          continue;
+        }
+        const parsed = JSON.parse(raw);
+        console.log('✅ Parsed snapshot from', k, ':', parsed);
+        snapshots.push({ key: k, file: parsed.file || null, savedAt: parsed.savedAt || Date.now() });
+      } catch (e) {
+        console.warn('❌ Failed to parse snapshot', k, e.message);
+      }
+    }
+
+    console.log('✅ Returning', snapshots.length, 'snapshots');
+    return res.json({ success: true, data: { snapshots } });
+  } catch (error) {
+    console.error('❌ Get snapshots error:', error);
+    return res.status(500).json({ success: false, message: 'Error fetching snapshots' });
   }
 };
 
@@ -220,7 +305,7 @@ exports.getFile = async (req, res) => {
     const { id } = req.params;
 
     // Check Redis cache first
-    const cachedFile = await redisUtils.get(`file:${id}`);
+    const cachedFile = await getCachedFile(id);
 
     if (cachedFile) {
       return res.json({
@@ -245,7 +330,7 @@ exports.getFile = async (req, res) => {
     }
 
     // Cache for 1 hour
-    await redisUtils.setex(`file:${id}`, 3600, file);
+    await cacheFile(id, file, 3600);
 
     res.json({
       success: true,

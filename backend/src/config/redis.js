@@ -4,24 +4,72 @@ const redis = require('redis');
 
 
 let redisClient;
-// connect to redis server
-const connectRedis = async () => {
-  try {
-    redisClient = redis.createClient({
-      socket: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT) : 6379,
-        connectTimeout: 5000, // 5 second timeout
-        reconnectStrategy: (retries) => {
-          if (retries > 2) {
-            console.warn('⚠️  Redis reconnection attempts exhausted');
-            return new Error('Redis reconnection failed');
-          }
-          return retries * 100;
+
+const createClientWithOptions = (opts = {}) => {
+  return redis.createClient({
+    socket: {
+      host: opts.host || 'localhost',
+      port: opts.port || 6379,
+      connectTimeout: opts.connectTimeout || 5000,
+      reconnectStrategy: (retries) => {
+        if (retries > (opts.maxReconnectAttempts || 2)) {
+          console.warn('⚠️  Redis reconnection attempts exhausted');
+          return new Error('Redis reconnection failed');
         }
-      },
-      password: process.env.REDIS_PASSWORD || undefined,
-      username: process.env.REDIS_USERNAME || undefined,
+        return retries * 100;
+      }
+    },
+    password: opts.password || undefined,
+    username: opts.username || undefined,
+  });
+};
+
+// connect to local redis server (localhost)
+const connectRedisLocal = async () => {
+  try {
+    redisClient = createClientWithOptions({
+      host: '127.0.0.1',
+      port: process.env.REDIS_LOCAL_PORT ? parseInt(process.env.REDIS_LOCAL_PORT) : 6379,
+      connectTimeout: 3000,
+      maxReconnectAttempts: 2,
+    });
+
+    // Event listeners
+    redisClient.on('error', (err) => console.error('❌ Redis Client Error:', err.message));
+    redisClient.on('connect', () => console.log('🔗 Connecting to Redis (local)...'));
+    redisClient.on('ready', () => console.log('✅ Redis (local) connected successfully'));
+    redisClient.on('end', () => console.log('🔌 Redis (local) connection closed'));
+
+    await Promise.race([
+      redisClient.connect(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Redis local connection timeout')), 3000))
+    ]);
+
+    return redisClient;
+  } catch (error) {
+    console.error('⚠️  Redis (local) connection failed:', error.message);
+    redisClient = null;
+    return null;
+  }
+};
+
+// connect to redis using env vars (works for docker service, localhost, and cloud)
+const connectRedisCloud = async () => {
+  try {
+    const host = process.env.REDIS_HOST || '127.0.0.1';
+    const port = process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT) : 6379;
+    const password = process.env.REDIS_PASSWORD || undefined;
+    const username = process.env.REDIS_USERNAME || undefined;
+
+    console.log(`ℹ️  Connecting to Redis at ${host}:${port}...`);
+
+    redisClient = createClientWithOptions({
+      host,
+      port,
+      connectTimeout: 5000,
+      password,
+      username,
+      maxReconnectAttempts: 3
     });
 
     // Event listeners
@@ -30,29 +78,36 @@ const connectRedis = async () => {
     redisClient.on('ready', () => console.log('✅ Redis connected successfully'));
     redisClient.on('end', () => console.log('🔌 Redis connection closed'));
 
-    // Connect to Redis with timeout
     await Promise.race([
       redisClient.connect(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Redis connection timeout')), 5000))
     ]);
 
-    // Test setting and getting a value
-    await redisClient.set("ritesh", "sharma", { EX: 10 });
-    const value = await redisClient.get("ritesh");
-    console.log("✅ Value set in Redis for testing:", value);
+    // test ping
+    try {
+      const pong = await redisClient.ping();
+      console.log('✅ Ping response from Redis:', pong);
+    } catch (e) {
+      console.warn('⚠️  Ping test failed:', e.message);
+    }
+    try {
+      redisClient.set('redis_test_key', 'test_value', 'EX', 60); // set a test key with 60s TTL
 
-    // Test ping
-    const pong = await redisClient.ping();
-    console.log("✅ Ping response from Redis:", pong);
+      console.log('✅ set test key in Redis successfully');
+    } catch (e) {
+      console.warn('⚠️  Set test key failed:', e.message);
+    }
 
     return redisClient;
   } catch (error) {
     console.error('⚠️  Redis connection failed:', error.message);
-    console.warn('⚠️  Starting server without Redis. Some features may not work.');
-    redisClient = null; // Set to null so it's not tried again
+    redisClient = null;
     return null;
   }
 };
+
+// Backwards-compatible default: connectRedis will connect to local Redis
+const connectRedis = connectRedisLocal;
 
 
 /**
@@ -371,6 +426,8 @@ const getCacheStats = async () => {
 
 module.exports = {
   connectRedis,
+  connectRedisLocal,
+  connectRedisCloud,
   getRedisClient,
   closeRedis,
   cacheUser,

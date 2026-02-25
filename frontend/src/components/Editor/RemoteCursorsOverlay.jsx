@@ -8,6 +8,8 @@ import { getUserColor, getContrastingTextColor } from "../../utils/userColors";
 export const RemoteCursorsOverlay = ({ remoteCursors, editorInstance }) => {
   const labelsContainerRef = useRef(null);
   const previousCursorsRef = useRef(new Map());
+  const rerenderTimerRef = useRef(null);
+  const disposablesRef = useRef([]);
 
   // Initialize container on mount
   useEffect(() => {
@@ -39,8 +41,14 @@ export const RemoteCursorsOverlay = ({ remoteCursors, editorInstance }) => {
 
     labelsContainerRef.current = container;
 
+    // Cleanup on unmount: remove listeners
     return () => {
-      // Keep container for other uses
+      // dispose any editor subscriptions
+      try {
+        disposablesRef.current.forEach((d) => d && typeof d.dispose === "function" && d.dispose());
+      } catch (e) {}
+      disposablesRef.current = [];
+      // keep container in DOM (do not remove) to avoid flicker when remounting
     };
   }, [editorInstance]);
 
@@ -57,88 +65,125 @@ export const RemoteCursorsOverlay = ({ remoteCursors, editorInstance }) => {
       return;
     }
 
-    // Clear container
+    
     const container = labelsContainerRef.current;
-    container.innerHTML = "";
 
-    // If no remote cursors, return
-    if (!remoteCursors || remoteCursors.size === 0) {
-      console.debug("RemoteCursorsOverlay: No cursors to render");
-      previousCursorsRef.current = new Map();
-      return;
-    }
-
-    console.debug("RemoteCursorsOverlay: Rendering cursors", {
-      count: remoteCursors.size,
-      cursors: Array.from(remoteCursors.entries()).map(([id, cursor]) => ({
-        id: id.substring(0, 8),
-        username: cursor.username,
-        position: { line: cursor.line, column: cursor.column },
-      })),
-    });
-
-    // Render each cursor
-    remoteCursors.forEach(({ line, column, username }, socketId) => {
+    const renderAllCursors = () => {
       try {
-        const color = getUserColor(username);
-        const textColor = getContrastingTextColor(color);
+        container.innerHTML = "";
 
-        // Get cursor position in editor coordinates
-        const position = editorInstance.getScrolledVisiblePosition({
-          lineNumber: Math.max(1, line + 1),
-          column: Math.max(1, column + 1),
+        if (!remoteCursors || remoteCursors.size === 0) {
+          previousCursorsRef.current = new Map();
+          return;
+        }
+
+        console.debug("RemoteCursorsOverlay: Rendering cursors", {
+          count: remoteCursors.size,
         });
 
-        if (!position) return;
+        remoteCursors.forEach(({ line, column, username }, socketId) => {
+          try {
+            const color = getUserColor(username);
+            const textColor = getContrastingTextColor(color);
 
-        const { left, top, height } = position;
+            const position = editorInstance.getScrolledVisiblePosition({
+              lineNumber: Math.max(1, line + 1),
+              column: Math.max(1, column + 1),
+            });
 
-        // Create cursor line
-        const cursorLine = document.createElement("div");
-        cursorLine.style.cssText = `
-          position: absolute;
-          left: ${left}px;
-          top: ${top}px;
-          width: 2px;
-          height: ${Math.max(height || 20, 18)}px;
-          background-color: ${color};
-          opacity: 0.9;
-          z-index: 1001;
-          animation: remoteCursorBlink 1s infinite;
-          box-shadow: 0 0 3px ${color};
-          pointer-events: none;
-        `;
+            if (!position) return;
 
-        // Create username label
-        const label = document.createElement("div");
-        label.style.cssText = `
-          position: absolute;
-          left: ${left}px;
-          top: ${top - 22}px;
-          background-color: ${color};
-          color: ${textColor};
-          padding: 2px 6px;
-          border-radius: 3px;
-          font-size: 12px;
-          font-weight: 600;
-          white-space: nowrap;
-          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-          z-index: 1002;
-          font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
-          pointer-events: none;
-        `;
-        label.textContent = username;
+            const { left, top, height } = position;
 
-        container.appendChild(cursorLine);
-        container.appendChild(label);
-      } catch (error) {
-        // Silently handle positioning errors during scrolling
-        console.debug("Cursor positioning error:", error);
+            // Calculate offsets between editor content and the overlay container
+            const editorDOMRect = editorInstance.getDomNode().getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            const offsetLeft = editorDOMRect.left - containerRect.left;
+            const offsetTop = editorDOMRect.top - containerRect.top;
+
+            const finalLeft = left + offsetLeft;
+            const finalTop = top + offsetTop;
+
+            const cursorLine = document.createElement("div");
+            cursorLine.style.cssText = `
+              position: absolute;
+              left: ${finalLeft}px;
+              top: ${finalTop}px;
+              width: 2px;
+              height: ${Math.max(height || 20, 18)}px;
+              background-color: ${color};
+              opacity: 0.9;
+              z-index: 1001;
+              animation: remoteCursorBlink 1s infinite;
+              box-shadow: 0 0 3px ${color};
+              pointer-events: none;
+            `;
+
+            const label = document.createElement("div");
+            label.style.cssText = `
+              position: absolute;
+              left: ${finalLeft}px;
+              top: ${finalTop - 22}px;
+              background-color: ${color};
+              color: ${textColor};
+              padding: 2px 6px;
+              border-radius: 3px;
+              font-size: 12px;
+              font-weight: 600;
+              white-space: nowrap;
+              box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+              z-index: 1002;
+              font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+              pointer-events: none;
+            `;
+            label.textContent = username;
+
+            container.appendChild(cursorLine);
+            container.appendChild(label);
+          } catch (error) {
+            console.debug("Cursor positioning error:", error);
+          }
+        });
+
+        previousCursorsRef.current = new Map(remoteCursors);
+      } catch (err) {
+        console.debug("RemoteCursorsOverlay render error:", err);
       }
-    });
+    };
 
-    // Store current cursors for comparison
-    previousCursorsRef.current = new Map(remoteCursors);
+    // initial render
+    renderAllCursors();
+
+    // Attach editor listeners to keep cursors in place during scroll/resize
+    try {
+      const onScroll = () => {
+        if (rerenderTimerRef.current) clearTimeout(rerenderTimerRef.current);
+        rerenderTimerRef.current = setTimeout(() => renderAllCursors(), 30);
+      };
+
+      const onLayout = () => {
+        if (rerenderTimerRef.current) clearTimeout(rerenderTimerRef.current);
+        rerenderTimerRef.current = setTimeout(() => renderAllCursors(), 30);
+      };
+
+      // Monaco subscriptions
+      const s1 = editorInstance.onDidScrollChange(onScroll);
+      const s2 = editorInstance.onDidLayoutChange(onLayout);
+      const s3 = editorInstance.onDidChangeCursorPosition(() => {
+        // When remote cursor positions change, re-render to follow movements
+        if (rerenderTimerRef.current) clearTimeout(rerenderTimerRef.current);
+        rerenderTimerRef.current = setTimeout(() => renderAllCursors(), 10);
+      });
+
+      disposablesRef.current.push(s1, s2, s3);
+
+      // Also listen to window resize as editor DOM rects change
+      window.addEventListener("resize", onLayout);
+      disposablesRef.current.push({ dispose: () => window.removeEventListener("resize", onLayout) });
+    } catch (e) {
+      console.debug("Failed to attach Monaco listeners:", e);
+    }
+
   }, [remoteCursors, editorInstance]);
 
   return null;
