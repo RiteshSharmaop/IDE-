@@ -79,7 +79,7 @@ export function SignupCard() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.post("/api/auth/signup", {
+      const res = await api.post("/auth/signup", {
         username,
         email,
         password,

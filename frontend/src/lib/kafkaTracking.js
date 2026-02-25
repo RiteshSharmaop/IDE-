@@ -4,8 +4,22 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8080/api",
+  baseURL: import.meta.env.VITE_BACKEND_URL || "http://localhost:8080/api",
 });
+
+// Add request interceptor to include authentication token
+API.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 /**
  * Track code execution event to Kafka
@@ -26,7 +40,11 @@ export async function trackCodeExecution(data) {
     console.log("✅ Code execution tracked:", response.data.eventId);
     return response.data;
   } catch (error) {
-    console.error("❌ Failed to track code execution:", error);
+    if (error.response?.status === 401) {
+      console.warn("⚠️ Not authenticated. Please log in to track execution.");
+    } else {
+      console.error("❌ Failed to track code execution:", error.response?.data?.message || error.message);
+    }
     // Don't throw - tracking shouldn't block execution
   }
 }
@@ -48,7 +66,11 @@ export async function trackFileOperation(data) {
     console.log("✅ File operation tracked:", response.data.eventId);
     return response.data;
   } catch (error) {
-    console.error("❌ Failed to track file operation:", error);
+    if (error.response?.status === 401) {
+      console.warn("⚠️ Not authenticated. Please log in to track file operations.");
+    } else {
+      console.error("❌ Failed to track file operation:", error.response?.data?.message || error.message);
+    }
   }
 }
 
@@ -64,7 +86,11 @@ export async function trackIDEMetrics(data) {
       theme: data.theme,
       roomId: data.roomId || "default",
     });
-
+if (error.response?.status === 401) {
+      console.warn("⚠️ Not authenticated. Please log in to track IDE metrics.");
+    } else {
+      console.error("❌ Failed to track IDE metrics:", error.response?.data?.message || error.message);
+    }
     console.log("✅ IDE metrics tracked");
     return response.data;
   } catch (error) {

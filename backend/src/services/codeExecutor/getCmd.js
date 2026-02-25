@@ -13,12 +13,12 @@ const getCommands = (language, tempFile) => {
       cpp: {
         extension: ".cpp",
         compile: `g++ ${tempFile}.cpp -o ${tempFile}.out`,
-        execute: `./${tempFile}.out`,
+        execute: `${tempFile}.out`,
       },
       c: {
         extension: ".c",
         compile: `gcc ${tempFile}.c -o ${tempFile}.out`,
-        execute: `./${tempFile}.out`,
+        execute: `${tempFile}.out`,
       },
       java: {
         extension: ".java",

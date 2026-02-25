@@ -1,66 +1,41 @@
+const fs = require("fs");
 const { exec } = require("child_process");
 const { promisify } = require("util");
 const execPromise = promisify(exec);
-const { getCommands } = require("../getCmd");
 
-const containerName = "code-executor"; // Make sure this matches your Docker container
-const timeout = 10000; // 10 seconds
+const containerName = "code-executor";
+const timeout = 10000;
 
 exports.runJavascriptCode = async (code, input = "") => {
-  const fileName = `code_${Date.now()}`;
-  const tempFile = `/tmp/${fileName}`;
-  const commands = getCommands("javascript", tempFile);
+  const fileName = `code_${Date.now()}.js`;
+  const localTempFile = `/tmp/${fileName}`;
+  const containerTempFile = `/tmp/${fileName}`;
 
+  // write local copy for debugging
+  fs.writeFileSync(localTempFile, code);
 
- try {
-      // 📝 Write code to temp file using echo (simplified approach)
-      const sanitizedCode = code
-        .replace(/"/g, '\\"')
-        .replace(/\$/g, "\\$")
-        .replace(/`/g, "\\`");
-      const writeCmd = `docker exec -i ${containerName} bash -c "echo \\"${sanitizedCode}\\" > ${tempFile}${commands.extension}"`;
-      console.log("Write Command:", writeCmd);
-      await execPromise(writeCmd);
+  try {
+    // write code into container using base64 encoding to preserve all characters including quotes
+    const encodedCode = Buffer.from(code).toString('base64');
+    const writeCmd = `docker exec -i ${containerName} bash -c "echo '${encodedCode}' | base64 -d > ${containerTempFile}"`;
+    await execPromise(writeCmd, { timeout: 5000, maxBuffer: 1024 * 1024 });
 
-      // ⚙️ Compile step (if needed)
-      if (commands.compile) {
-        const compileCmd = `docker exec -i ${containerName} bash -c "${commands.compile}"`;
-        console.log("Compile Command:", compileCmd);
-        await execPromise(compileCmd, { timeout: timeout / 2 });
-      }
+    // prepare execute command, piping input if provided
+    const sanitizedInput = (input || "").replace(/'/g, "'\\''");
+    const execCmd = sanitizedInput
+      ? `docker exec -i ${containerName} bash -c "echo '${sanitizedInput}' | node ${containerTempFile}"`
+      : `docker exec -i ${containerName} bash -c "node ${containerTempFile}"`;
 
-      // ▶️ Execute the program, piping input if present
-      const sanitizedInput = input.replace(/'/g, "'\\''").replace(/\$/g, "\\$");
-      const executeCmd = `docker exec -i ${containerName} bash -c "echo '${sanitizedInput}' | ${commands.execute}"`;
-      console.log("Execute Command:", executeCmd);
+    const { stdout, stderr } = await execPromise(execCmd, { timeout, maxBuffer: 1024 * 1024 });
 
-      const { stdout, stderr } = await execPromise(executeCmd, {
-        timeout: timeout,
-        maxBuffer: 1024 * 1024, // 1 MB output limit
-      });
+    // cleanup
+    try { fs.unlinkSync(localTempFile); } catch (e) {}
+    await execPromise(`docker exec -i ${containerName} bash -c "rm -f ${containerTempFile} || true"`).catch(() => {});
 
-      // 🧹 Cleanup temporary files
-      await execPromise(
-        `docker exec -i ${containerName} bash -c "rm -f ${tempFile}* || true"`
-      );
-
-      return {
-        success: !stderr || stderr.trim() === "",
-        output: stdout.trim(),
-        error: stderr.trim(),
-      };
-    } catch (error) {
-      // Cleanup on failure
-      try {
-        await execPromise(
-          `docker exec -i ${containerName} bash -c "rm -f ${tempFile}* || true"`
-        );
-      } catch {}
-
-      return {
-        success: false,
-        output: error.stdout?.trim() || "",
-        error: error.stderr?.trim() || error.message,
-      };
-    }
+    return { success: !stderr || stderr.trim() === "", output: stdout.trim(), error: stderr.trim() };
+  } catch (error) {
+    try { if (fs.existsSync(localTempFile)) fs.unlinkSync(localTempFile); } catch (e) {}
+    try { await execPromise(`docker exec -i ${containerName} bash -c "rm -f ${containerTempFile} || true"`); } catch (e) {}
+    return { success: false, output: error.stdout?.trim() || "", error: error.stderr?.trim() || error.message };
+  }
 };

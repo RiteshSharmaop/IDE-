@@ -11,33 +11,46 @@ const connectRedis = async () => {
       socket: {
         host: process.env.REDIS_HOST || 'localhost',
         port: process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT) : 6379,
+        connectTimeout: 5000, // 5 second timeout
+        reconnectStrategy: (retries) => {
+          if (retries > 2) {
+            console.warn('⚠️  Redis reconnection attempts exhausted');
+            return new Error('Redis reconnection failed');
+          }
+          return retries * 100;
+        }
       },
       password: process.env.REDIS_PASSWORD || undefined,
       username: process.env.REDIS_USERNAME || undefined,
     });
 
     // Event listeners
-    redisClient.on('error', (err) => console.error('❌ Redis Client Error:', err));
+    redisClient.on('error', (err) => console.error('❌ Redis Client Error:', err.message));
     redisClient.on('connect', () => console.log('🔗 Connecting to Redis...'));
     redisClient.on('ready', () => console.log('✅ Redis connected successfully'));
     redisClient.on('end', () => console.log('🔌 Redis connection closed'));
 
-    // Connect to Redis
-    await redisClient.connect();
+    // Connect to Redis with timeout
+    await Promise.race([
+      redisClient.connect(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Redis connection timeout')), 5000))
+    ]);
 
     // Test setting and getting a value
-    await redisClient.set("ritesh", "sharma", { EX: 10 }); // EX sets expiry in seconds
+    await redisClient.set("ritesh", "sharma", { EX: 10 });
     const value = await redisClient.get("ritesh");
-    console.log("Value set in Redis for testing:", value);
+    console.log("✅ Value set in Redis for testing:", value);
 
     // Test ping
     const pong = await redisClient.ping();
-    console.log("Ping response from Redis:", pong);
+    console.log("✅ Ping response from Redis:", pong);
 
     return redisClient;
   } catch (error) {
-    console.error('❌ Redis connection failed:', error.message);
-    throw error;
+    console.error('⚠️  Redis connection failed:', error.message);
+    console.warn('⚠️  Starting server without Redis. Some features may not work.');
+    redisClient = null; // Set to null so it's not tried again
+    return null;
   }
 };
 
@@ -46,8 +59,13 @@ const connectRedis = async () => {
  * Get Redis client instance
  */
 const getRedisClient = () => {
-  if (!redisClient || !redisClient.isOpen) {
-    throw new Error('Redis client not connected');
+  if (!redisClient) {
+    console.warn('⚠️  Redis client not available');
+    return null;
+  }
+  if (!redisClient.isOpen) {
+    console.warn('⚠️  Redis client not connected');
+    return null;
   }
   return redisClient;
 };
@@ -71,6 +89,7 @@ const closeRedis = async () => {
 const cacheUser = async (userId, userData, ttl = 86400) => {
   try {
     const client = getRedisClient();
+    if (!client) return false;
     const key = `user:${userId}`;
     await client.setEx(key, ttl, JSON.stringify(userData));
     return true;
@@ -87,6 +106,7 @@ const cacheUser = async (userId, userData, ttl = 86400) => {
 const getCachedUser = async (userId) => {
   try {
     const client = getRedisClient();
+    if (!client) return null;
     const key = `user:${userId}`;
     const data = await client.get(key);
     return data ? JSON.parse(data) : null;
@@ -105,6 +125,7 @@ const getCachedUser = async (userId) => {
 const cacheFile = async (fileId, fileData, ttl = 3600) => {
   try {
     const client = getRedisClient();
+    if (!client) return false;
     const key = `file:${fileId}`;
     await client.setEx(key, ttl, JSON.stringify(fileData));
     return true;
@@ -121,6 +142,7 @@ const cacheFile = async (fileId, fileData, ttl = 3600) => {
 const getCachedFile = async (fileId) => {
   try {
     const client = getRedisClient();
+    if (!client) return null;
     const key = `file:${fileId}`;
     const data = await client.get(key);
     return data ? JSON.parse(data) : null;
@@ -141,6 +163,7 @@ const getCachedFile = async (fileId) => {
 const cacheFilesList = async (userId, page, search, files, ttl = 300) => {
   try {
     const client = getRedisClient();
+    if (!client) return false;
     const key = `user:${userId}:files:${page}:${search || 'all'}`;
     await client.setEx(key, ttl, JSON.stringify(files));
     return true;
@@ -159,6 +182,7 @@ const cacheFilesList = async (userId, page, search, files, ttl = 300) => {
 const getCachedFilesList = async (userId, page, search) => {
   try {
     const client = getRedisClient();
+    if (!client) return null;
     const key = `user:${userId}:files:${page}:${search || 'all'}`;
     const data = await client.get(key);
     return data ? JSON.parse(data) : null;
@@ -175,6 +199,7 @@ const getCachedFilesList = async (userId, page, search) => {
 const invalidateUserFilesCache = async (userId) => {
   try {
     const client = getRedisClient();
+    if (!client) return false;
     const pattern = `user:${userId}:files:*`;
     const keys = await client.keys(pattern);
     
@@ -195,6 +220,7 @@ const invalidateUserFilesCache = async (userId) => {
 const invalidateFileCache = async (fileId) => {
   try {
     const client = getRedisClient();
+    if (!client) return false;
     const key = `file:${fileId}`;
     await client.del(key);
     return true;
@@ -211,6 +237,7 @@ const invalidateFileCache = async (fileId) => {
 const invalidateUserCache = async (userId) => {
   try {
     const client = getRedisClient();
+    if (!client) return false;
     const key = `user:${userId}`;
     await client.del(key);
     return true;
@@ -230,6 +257,10 @@ const invalidateUserCache = async (userId) => {
 const checkRateLimit = async (userId, limit = 50, windowMs = 3600000) => {
   try {
     const client = getRedisClient();
+    if (!client) {
+      // If Redis unavailable, allow the request (fail open)
+      return { allowed: true, remaining: limit, resetTime: Date.now() + windowMs };
+    }
     const key = `ratelimit:execute:${userId}`;
     const ttl = Math.ceil(windowMs / 1000);
     
@@ -275,6 +306,7 @@ const checkRateLimit = async (userId, limit = 50, windowMs = 3600000) => {
 const blacklistToken = async (token, ttl) => {
   try {
     const client = getRedisClient();
+    if (!client) return false;
     const key = `blacklist:${token}`;
     await client.setEx(key, ttl, 'true');
     return true;
@@ -291,6 +323,7 @@ const blacklistToken = async (token, ttl) => {
 const isTokenBlacklisted = async (token) => {
   try {
     const client = getRedisClient();
+    if (!client) return false; // If Redis unavailable, token is not blacklisted
     const key = `blacklist:${token}`;
     const result = await client.get(key);
     return result !== null;
@@ -306,6 +339,7 @@ const isTokenBlacklisted = async (token) => {
 const clearAllCache = async () => {
   try {
     const client = getRedisClient();
+    if (!client) return false;
     await client.flushDb();
     console.log('✅ All cache cleared');
     return true;

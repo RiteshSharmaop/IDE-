@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   mongodb:
     image: mongo:latest
@@ -8,6 +10,7 @@ services:
       - mongodb_data:/data/db
     environment:
       MONGO_INITDB_DATABASE: code-ide
+    restart: unless-stopped
 
   redis:
     image: redis/redis-stack
@@ -16,8 +19,9 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    restart: unless-stopped
 
-  app:
+  backend:
     build: .
     container_name: code-ide-backend
     ports:
@@ -25,30 +29,40 @@ services:
     depends_on:
       - mongodb
       - redis
+      - code-executor
     environment:
-      - MONGODB_URI=mongodb+srv://ritesh:ritesh9122@ide.wco15ph.mongodb.net/
+      - PORT=8080
+      - MONGODB_URI=mongodb://mongodb:27017/code-ide
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     volumes:
-      - .:/usr/src/app # Mount entire project
+      - .:/usr/src/app
       - /usr/src/app/node_modules
-    command: npm run dev # Nodemon handles restart automatically
-  app2:
-    build: .
-    container_name: code-ide-backendaa
-    ports:
-      - "8081:8081"
-    depends_on:
-      - mongodb
-      - redis
-    environment:
-      - MONGODB_URI=mongodb+srv://ritesh:ritesh9122@ide.wco15ph.mongodb.net/
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: npm run dev
+    restart: unless-stopped
+
+
+  code-executor:
+    build:
+      context: .
+      dockerfile: src/services/codeExecutor/Dockerfile
+    container_name: code-executor
+    mem_limit: 512m
+    cpus: 0.5
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # read_only: true
     volumes:
-      - .:/usr/src/app # Mount entire project
-      - /usr/src/app/node_modules
-    command: npm run dev # Nodemon handles restart automatically
+      - ./execution:/execution
+    tmpfs:
+      - /tmp
+      # - /execution
+    network_mode: none
+    restart: unless-stopped
 
 volumes:
   mongodb_data:

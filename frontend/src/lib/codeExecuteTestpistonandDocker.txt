@@ -3,7 +3,7 @@ import axios from "axios";
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
 const API = axios.create({
-  baseURL: BACKEND_URL + "/api",
+  baseURL: BACKEND_URL,
 });
 
 // Add auth interceptor
@@ -31,15 +31,11 @@ const LANGUAGE_VERSIONS = {
 
 export const runTheCode = async (language, sourceCode, input = "") => {
   try {
-    console.log("Calling to run : " , language , " " , sourceCode , " " , input);
-    
     const res = await API.post("/execute/run", {
       code: sourceCode,
       language,
       input,
     });
-    console.log("res " , res );
-    
 
     if (!res.data.success) {
       throw new Error(res.data.message || "Code execution failed");
@@ -64,3 +60,42 @@ export const runTheCode = async (language, sourceCode, input = "") => {
     throw new Error(errorMessage);
   }
 };
+
+
+
+
+
+
+// pistone code
+import axios from "axios";
+
+const API = axios.create({
+  baseURL: "https://emkc.org/api/v2/piston",
+});
+
+const LANGUAGE_VERSIONS = {
+  javascript: "18.15.0",
+  typescript: "5.0.3",
+  python: "3.10.0",
+  java: "15.0.2",
+  csharp: "6.12.0",
+  cpp: "10.2.0",
+};
+
+export const runTheCode = async (language, sourceCode, input = "") => {
+  try {
+    console.log("🚀 Running code:", { language, codeLength: sourceCode.length, hasInput: !!input });
+    const res = await API.post("/execute", {
+      language,
+      version: LANGUAGE_VERSIONS[language],
+      files: [{ content: sourceCode }],
+      stdin: input, // 👈 this is where you send user input
+    });
+    console.log("✅ Code execution response:", res.data);
+    return res.data.run;
+  } catch (error) {
+    console.error("❌ Error running code:", error.response?.data || error.message);
+    throw error;
+  }
+};
+

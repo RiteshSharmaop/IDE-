@@ -101,6 +101,8 @@ const signup = async (req, res) => {
 const signin = async (req, res) => {
   try {
     const { email, password } = req.body;
+    
+    
 
     // Validation
     if (!email || !password) {

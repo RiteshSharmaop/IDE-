@@ -47,7 +47,7 @@ export function AuthProvider({ children }) {
       }
 
       try {
-        const res = await api.get("/api/auth/me");
+        const res = await api.get("/auth/me");
         if (res?.data?.success) {
           const backendUser = res.data.data.user;
 
@@ -94,7 +94,7 @@ export function AuthProvider({ children }) {
 
   const signout = async () => {
     try {
-      await api.post("/api/auth/logout");
+      await api.post("/auth/logout");
       console.log("Logout Room : ", roomId);
       setRoomId("");
     } catch {}

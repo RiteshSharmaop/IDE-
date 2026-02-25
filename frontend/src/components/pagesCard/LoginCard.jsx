@@ -99,7 +99,7 @@ export function LoginCard() {
     const createdRoomId = crypto.randomUUID();
 
     try {
-      const res = await api.post("/api/auth/signin", { email, password });
+      const res = await api.post("/auth/signin", { email, password });
       if (res?.data?.success) {
         const token = res.data.data?.token;
         console.log("roomID ", createdRoomId);
@@ -112,9 +112,11 @@ export function LoginCard() {
 
         navigate(`/e/${createdRoomId}`);
       } else {
+        console.log("ERROOORORORO  ");
         setError(res?.data?.message || "Login failed");
       }
     } catch (err) {
+      console.log("ERROOORORORO 1111 ", err);
       setError(err?.response?.data?.message || err.message || "Server error");
     } finally {
       setLoading(false);
@@ -127,7 +129,7 @@ export function LoginCard() {
     setError(null);
 
     try {
-      const res = await api.post("/api/auth/signin", { email, password });
+      const res = await api.post("/auth/signin", { email, password });
       if (res?.data?.success) {
         const token = res.data.data?.token;
         const user = res.data.data?.user;

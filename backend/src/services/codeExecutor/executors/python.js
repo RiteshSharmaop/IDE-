@@ -11,14 +11,10 @@ exports.runPythonCode = async (code, input = "") => {
   const tempFile = `/tmp/${fileName}`;
   const commands = getCommands("python", tempFile);
 
-
- try {
-      // 📝 Write code to temp file using echo (simplified approach)
-      const sanitizedCode = code
-        .replace(/"/g, '\\"')
-        .replace(/\$/g, "\\$")
-        .replace(/`/g, "\\`");
-      const writeCmd = `docker exec -i ${containerName} bash -c "echo \\"${sanitizedCode}\\" > ${tempFile}${commands.extension}"`;
+  try {
+      // 📝 Write code to temp file using base64 encoding to preserve all characters including quotes
+      const encodedCode = Buffer.from(code).toString('base64');
+      const writeCmd = `docker exec -i ${containerName} bash -c "echo '${encodedCode}' | base64 -d > ${tempFile}${commands.extension}"`;
       console.log("Write Command:", writeCmd);
       await execPromise(writeCmd);
 
