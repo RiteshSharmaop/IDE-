@@ -2,6 +2,7 @@ import React, { useRef, useCallback } from "react";
 import Editor from "@monaco-editor/react";
 import { colors } from "../../lib/utils";
 import { RemoteCursorsOverlay } from "./RemoteCursorsOverlay";
+import { ActiveUsersOverlay } from "./ActiveUsersOverlay";
 
 export const MonacoEditor = ({
   value,
@@ -60,6 +61,10 @@ export const MonacoEditor = ({
           remoteCursors={remoteCursors}
           editorInstance={editorRef.current}
         />
+      )}
+      {/* Show compact list of active users with color indicators */}
+      {editorRef.current && (
+        <ActiveUsersOverlay remoteCursors={remoteCursors} />
       )}
     </div>
   );

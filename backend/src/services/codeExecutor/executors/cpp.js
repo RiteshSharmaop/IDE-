@@ -43,10 +43,14 @@ exports.runCppCode = async (code, input = "") => {
 		}
 
 		// run
-		const sanitizedInput = input.replace(/'/g, "'\\''");
-		const executeCmd = input
-			? `docker exec -i ${containerName} bash -c "echo '${sanitizedInput}' | ${outPath}"`
-			: `docker exec -i ${containerName} bash -c "${outPath}"`;
+		const trimmedInput = input || "";
+		let executeCmd;
+		if (trimmedInput) {
+			const inputB64 = Buffer.from(trimmedInput, 'utf8').toString('base64');
+			executeCmd = `docker exec -i ${containerName} bash -c "echo '${inputB64}' | base64 -d | ${outPath}"`;
+		} else {
+			executeCmd = `docker exec -i ${containerName} bash -c "${outPath}"`;
+		}
 
 		const { stdout, stderr } = await execPromise(executeCmd, { timeout, maxBuffer: 1024 * 1024 });
 

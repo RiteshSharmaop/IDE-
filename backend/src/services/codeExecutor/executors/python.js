@@ -26,8 +26,14 @@ exports.runPythonCode = async (code, input = "") => {
       }
 
       // ▶️ Execute the program, piping input if present
-      const sanitizedInput = input.replace(/'/g, "'\\''").replace(/\$/g, "\\$");
-      const executeCmd = `docker exec -i ${containerName} bash -c "echo '${sanitizedInput}' | ${commands.execute}"`;
+      const trimmedInput = input || "";
+      let executeCmd;
+      if (trimmedInput) {
+        const inputB64 = Buffer.from(trimmedInput, 'utf8').toString('base64');
+        executeCmd = `docker exec -i ${containerName} bash -c "echo '${inputB64}' | base64 -d | ${commands.execute}"`;
+      } else {
+        executeCmd = `docker exec -i ${containerName} bash -c "${commands.execute}"`;
+      }
       console.log("Execute Command:", executeCmd);
 
       const { stdout, stderr } = await execPromise(executeCmd, {

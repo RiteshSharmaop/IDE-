@@ -10,6 +10,7 @@ const {
   saveFileToRoom,
   getRoomFiles,
   saveToRedis,
+  getSnapshots,
 } = require("../controllers/fileController");
 const { protect } = require("../middleware/auth");
 
@@ -22,6 +23,22 @@ router.post("/", protect, createFile);
 // @desc    Get all files for logged-in user (with pagination + search)
 // @access  Private
 router.get("/", protect, getFiles);
+
+// ⚠️ SPECIFIC ROUTES MUST COME BEFORE PARAMETER ROUTES (:id, :fileId)
+// @route   POST /api/files/save-redis
+// @desc    Save a code snapshot to Redis
+// @access  Private
+router.post('/save-redis', protect, saveToRedis);
+
+// @route   GET /api/files/snapshots
+// @desc    Get saved snapshots from Redis for the user
+// @access  Private
+router.get('/snapshots', protect, getSnapshots);
+
+// @route   GET /api/files/room/:roomId
+// @desc    Get all files in a room
+// @access  Private
+router.get("/room/:roomId", protect, getRoomFiles);
 
 // @route   GET /api/files/:id
 // @desc    Get a single file by ID
@@ -42,15 +59,5 @@ router.delete("/:id", protect, deleteFile);
 // @desc    Save file to room
 // @access  Private
 router.post("/:fileId/save-to-room/:roomId", protect, saveFileToRoom);
-
-// @route   POST /api/files/save-redis
-// @desc    Save a code snapshot to Redis
-// @access  Private
-router.post('/save-redis', protect, saveToRedis);
-
-// @route   GET /api/files/room/:roomId
-// @desc    Get all files in a room
-// @access  Private
-router.get("/room/:roomId", protect, getRoomFiles);
 
 module.exports = router;

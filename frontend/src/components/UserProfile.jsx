@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
+import { apiClient } from "../lib/api";
 import { Link, useNavigate } from "react-router-dom";
 import { useRoom } from "../context/RoomContext";
+import { useSocket } from "../context/SocketContext";
 import { useTheme } from "../context/ThemeContext";
 import { ArrowLeft } from "lucide-react";
+import { useAuth } from "../lib/auth";
 
 // ─── Mock data (replace with your real API data) ──────────────────────────────
 const mockUser = {
@@ -98,7 +101,12 @@ const getThemeClasses = (theme) => {
 // ─── Layout ───────────────────────────────────────────────────────────────────
 function Layout({ activePage, setActivePage, children, roomId, theme }) {
   const navigate = useNavigate();
-  const navLinks = ["Overview", "Profile", "Addresses", "Orders"];
+  const navLinks = [
+    { key: "overview", label: "Overview" },
+    { key: "profile", label: "Profile" },
+    { key: "addresses", label: "Addresses" },
+    { key: "orders", label: "Saved Code" },
+  ];
   const themeClasses = getThemeClasses(theme);
   const handleEditorClick = () => {
     if (roomId) {
@@ -107,6 +115,7 @@ function Layout({ activePage, setActivePage, children, roomId, theme }) {
       navigate("/");
     }
   };
+  const {signout} = useAuth();
   return (
     <div style={{ backgroundColor: themeClasses.bg, color: themeClasses.text }} className="min-h-screen font-sans">
 
@@ -133,7 +142,7 @@ function Layout({ activePage, setActivePage, children, roomId, theme }) {
           <p style={{ color: themeClasses.text }} className="text-sm font-bold mb-3">Account</p>
           <nav className="flex flex-col">
             {navLinks.map((link) => {
-              const key = link.toLowerCase();
+              const key = link.key;
               const isActive = activePage === key;
               return (
                 <button
@@ -142,14 +151,22 @@ function Layout({ activePage, setActivePage, children, roomId, theme }) {
                   style={{ color: isActive ? themeClasses.text : themeClasses.sidebarTextInactive }}
                   className="text-left text-sm py-1.5 transition-colors"
                 >
-                  {isActive && <span className="font-semibold">{link}</span>}
-                  {!isActive && link}
+                  {isActive && <span className="font-semibold">{link.label}</span>}
+                  {!isActive && link.label}
                 </button>
               );
             })}
-            <button style={{ color: themeClasses.sidebarTextInactive }} className="text-left text-sm py-1.5 mt-3 hover:text-red-500 transition-colors">
+            {/* <button onClick={signout} style={{ color: themeClasses.sidebarTextInactive }} className="cursor-pointer text-left text-sm py-1.5 mt-3 hover:text-red-500 transition-colors">
               Log out
-            </button>
+            </button> */}
+            <button
+            onClick={signout}
+            className={`text-left text-sm py-1.5 mt-3 transition-colors w-15 cursor-pointer
+            ${themeClasses.sidebarTextInactive} hover:text-red-500`}
+          >
+            Log out
+          </button>
+
           </nav>
         </aside>
 
@@ -166,9 +183,9 @@ function Layout({ activePage, setActivePage, children, roomId, theme }) {
               You can find frequently asked questions and answers on our customer service page.
             </p>
           </div>
-          <a href="#" className="text-sm text-blue-600 hover:underline whitespace-nowrap mt-1">
+          <Link to="/not-found" className="text-sm text-blue-600 hover:underline whitespace-nowrap mt-1">
             Customer Service ↗
-          </a>
+          </Link>
         </div>
       </div>
     </div>
@@ -181,7 +198,7 @@ function OverviewPage({ user, orders, addresses, setActivePage, theme }) {
   const firstName  = user.username?.split(" ")[0] || "User";
   const themeClasses = getThemeClasses(theme);
 
-  return (
+  return ( 
     <div className="max-w-2xl">
       <div className="flex items-start justify-between mb-3">
         <h1 style={{ color: themeClasses.text }} className="text-3xl font-bold">Hello {firstName}</h1>
@@ -237,9 +254,9 @@ function OverviewPage({ user, orders, addresses, setActivePage, theme }) {
       </div>
 
       {/* Recent orders */}
-      <h2 style={{ color: themeClasses.text }} className="text-sm font-semibold mb-3">Recent orders</h2>
+      <h2 style={{ color: themeClasses.text }} className="text-sm font-semibold mb-3">Recent Saved Code</h2>
       {orders.length === 0 ? (
-        <p style={{ color: themeClasses.textSecondary }} className="text-sm">No recent orders</p>
+        <p style={{ color: themeClasses.textSecondary }} className="text-sm">No recent saved code</p>
       ) : (
         <div className="flex flex-col gap-3">
           {orders.map((o) => (
@@ -426,25 +443,33 @@ function AddressesPage({ addresses, theme }) {
 }
 
 // ─── Orders Page ──────────────────────────────────────────────────────────────
-function OrdersPage({ orders, theme }) {
+function OrdersPage({ orders, setOrders, theme }) {
   const themeClasses = getThemeClasses(theme);
+  console.log("📦 OrdersPage received orders:", orders, "orders.length:", orders?.length);
   return (
     <div className="max-w-2xl">
-      <h1 style={{ color: themeClasses.text }} className="text-3xl font-bold mb-2">Orders</h1>
+      <h1 style={{ color: themeClasses.text }} className="text-3xl font-bold mb-2">Saved Code</h1>
       <p style={{ color: themeClasses.textSecondary, borderColor: themeClasses.border }} className="text-sm leading-relaxed pb-8 mb-2 border-b">
-        View your order history and track your current orders.
+        View your saved code snippets and projects.
       </p>
-      {orders.length === 0 ? (
-        <p style={{ color: themeClasses.textSecondary }} className="text-sm py-6">No orders yet.</p>
+      {!orders || orders.length === 0 ? (
+        <p style={{ color: themeClasses.textSecondary }} className="text-sm py-6">No saved code yet.</p>
       ) : (
-        <div className="flex flex-col gap-3">
-          {orders.map((o) => (
-            <div key={o.id} style={{ borderColor: themeClasses.border, backgroundColor: themeClasses.inputBg }} className="border rounded px-4 py-3 text-sm flex justify-between items-center">
-              <span style={{ color: themeClasses.text }} className="font-medium">{o.id}</span>
-              <span style={{ color: themeClasses.textSecondary }}>{o.date}</span>
-              <span style={{ color: themeClasses.text }}>{o.status}</span>
-            </div>
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {orders.map((o, idx) => {
+            console.log(`📌 Rendering order ${idx}:`, o);
+            return (
+              <div key={o.id || idx} style={{ borderColor: themeClasses.border, backgroundColor: themeClasses.inputBg }} className="border rounded px-4 py-3 text-sm flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span style={{ color: themeClasses.text }} className="font-medium truncate">{o.name || o.id}</span>
+                  <span style={{ color: themeClasses.textSecondary, fontSize: 12 }}>{new Date(o.createdAt || o.date || Date.now()).toLocaleString()}</span>
+                </div>
+                <div className="text-sm text-left" style={{ color: themeClasses.text }}>
+                  <code className="block max-h-20 overflow-hidden text-xs whitespace-pre-wrap">{o.preview || (o.content || '').slice(0, 200)}</code>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -458,15 +483,98 @@ function OrdersPage({ orders, theme }) {
 // Usage 2 — connected to your real state:
 //   <AccountPage user={user} setUser={setUser} files={files} />
 //
-export default function AccountPage({ user: propUser, setUser: propSetUser, files = [], roomId:propRoomID}) {
-  const [localUser, setLocalUser] = useState({ ...mockUser, filesCreated: files.length || 0 });
+export default function AccountPage({ user: propUser, setUser: propSetUser, files = [], userFiles = [], roomId:propRoomID}) {
+  const incomingFiles = files.length ? files : (userFiles || []);
+  console.log("📂 AccountPage initialized with incomingFiles:", incomingFiles);
+  const [localUser, setLocalUser] = useState({ ...mockUser, filesCreated: incomingFiles.length || 0 });
   const { theme } = useTheme();
+  const { socket } = useSocket();
 
   const user    = propUser    ?? localUser;
   const setUser = propSetUser ?? setLocalUser;
   const roomId   = propRoomID ?? useRoom()?.roomId;
 
   const [activePage, setActivePage] = useState("overview");
+
+  // Saved files state (displayed on Saved Code page)
+  const [savedFiles, setSavedFiles] = useState((incomingFiles || []).map(f => ({
+    id: f.id,
+    name: f.name,
+    content: f.content,
+    language: f.language,
+    createdAt: f.createdAt || Date.now(),
+    preview: (f.content || "").slice(0, 200),
+  })));
+
+  // Listen for savedCode events to update list in real-time
+  useEffect(() => {
+    if (!socket) return;
+    const handler = ({ file, username, timestamp }) => {
+      if (!file || !file.id) return;
+      setSavedFiles((prev) => {
+        if (prev.find((p) => p.id === file.id)) return prev;
+        return [
+          {
+            id: file.id,
+            name: file.name || file.id,
+            content: file.content || "",
+            language: file.language || "",
+            createdAt: timestamp || Date.now(),
+            preview: (file.content || "").slice(0, 200),
+          },
+          ...prev,
+        ];
+      });
+    };
+
+    socket.on("savedCode", handler);
+    return () => socket.off("savedCode", handler);
+  }, [socket]);
+
+  // Load saved snapshots from backend (Redis) on mount
+  useEffect(() => {
+    let mounted = true;
+    const loadSnapshots = async () => {
+      try {
+        console.log("📥 Fetching snapshots from /api/files/snapshots...");
+        const res = await apiClient.get("/files/snapshots");
+        console.log("📊 Snapshots response:", res.data);
+        if (!mounted) return;
+        if (res?.data?.success) {
+          const snaps = (res.data.data.snapshots || []).map((s) => {
+            console.log("🔍 Processing snapshot:", s);
+            return {
+              id: s.key,
+              name: s.file?.name || s.key,
+              content: s.file?.content || "",
+              language: s.file?.language || "",
+              createdAt: s.savedAt || Date.now(),
+              preview: (s.file?.content || "").slice(0, 200),
+            };
+          });
+
+          console.log("✅ Processed snaps:", snaps);
+          if (snaps.length) {
+            setSavedFiles((prev) => {
+              const updated = [...snaps, ...prev];
+              console.log("💾 Updated savedFiles state:", updated);
+              return updated;
+            });
+          } else {
+            console.log("⚠️ No snapshots found");
+          }
+        } else {
+          console.log("❌ API returned success: false");
+        }
+      } catch (e) {
+        console.error("❌ Failed to load snapshots:", e);
+      }
+    };
+    loadSnapshots();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
  
   
@@ -475,11 +583,12 @@ export default function AccountPage({ user: propUser, setUser: propSetUser, file
   }, [roomId]);
 
   const renderPage = () => {
+    console.log("🎭 Rendering page:", activePage, "with savedFiles count:", savedFiles.length, "savedFiles:", savedFiles);
     switch (activePage) {
       case "overview":  return <OverviewPage user={user} orders={mockOrders} addresses={mockAddresses} setActivePage={setActivePage} theme={theme} />;
       case "profile":   return <ProfilePage user={user} setUser={setUser} roomId={roomId} theme={theme} />;
       case "addresses": return <AddressesPage addresses={mockAddresses} theme={theme} />;
-      case "orders":    return <OrdersPage orders={mockOrders} theme={theme} />;
+      case "orders":    return <OrdersPage orders={savedFiles} setOrders={setSavedFiles} theme={theme} />;
       default:          return null;
     }
   };

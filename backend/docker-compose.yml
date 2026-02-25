@@ -1,5 +1,9 @@
 version: "3.9"
 
+networks:
+  ide-network:
+    driver: bridge
+
 services:
   mongodb:
     image: mongo:latest
@@ -11,15 +15,20 @@ services:
     environment:
       MONGO_INITDB_DATABASE: code-ide
     restart: unless-stopped
+    networks:
+      - ide-network
 
   redis:
     image: redis/redis-stack
     container_name: code-ide-redis
+    # Port not exposed to host - accessed internally via docker network
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped
+    networks:
+      - ide-network
 
   backend:
     build: .
@@ -41,6 +50,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     command: npm run dev
     restart: unless-stopped
+    networks:
+      - ide-network
 
 
   code-executor:

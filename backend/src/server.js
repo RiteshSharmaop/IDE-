@@ -7,7 +7,6 @@ const { createServer } = require("node:http");
 require("dotenv").config();
 
 const connectDB = require("./config/database");
-const { connectRedis } = require("./config/redis");
 
 // Import routes
 const authRoutes = require("./routes/auth");
@@ -24,8 +23,11 @@ const app = express();
 const httpServer = createServer(app);
 
 // Connect to databases
+const { connectRedisCloud } = require("./config/redis");
+
 connectDB();
-connectRedis();
+// Connect to Redis (reads REDIS_HOST and REDIS_PORT from env; defaults to localhost:6379)
+connectRedisCloud();
 
 // Middleware
 app.use(helmet());

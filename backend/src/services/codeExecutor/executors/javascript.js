@@ -21,10 +21,15 @@ exports.runJavascriptCode = async (code, input = "") => {
     await execPromise(writeCmd, { timeout: 5000, maxBuffer: 1024 * 1024 });
 
     // prepare execute command, piping input if provided
-    const sanitizedInput = (input || "").replace(/'/g, "'\\''");
-    const execCmd = sanitizedInput
-      ? `docker exec -i ${containerName} bash -c "echo '${sanitizedInput}' | node ${containerTempFile}"`
-      : `docker exec -i ${containerName} bash -c "node ${containerTempFile}"`;
+    const trimmedInput = input || "";
+    let execCmd;
+    if (trimmedInput) {
+      // Use base64 to preserve newlines and special chars safely
+      const inputB64 = Buffer.from(trimmedInput, 'utf8').toString('base64');
+      execCmd = `docker exec -i ${containerName} bash -c "echo '${inputB64}' | base64 -d | node ${containerTempFile}"`;
+    } else {
+      execCmd = `docker exec -i ${containerName} bash -c "node ${containerTempFile}"`;
+    }
 
     const { stdout, stderr } = await execPromise(execCmd, { timeout, maxBuffer: 1024 * 1024 });
 

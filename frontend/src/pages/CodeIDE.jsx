@@ -778,6 +778,40 @@ const CodeIDE = () => {
       if (res?.data?.success) {
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 2000);
+        try {
+          const name = activeFile?.name || "file";
+          alert(`Saved ${name}`);
+        } catch (e) {
+          console.debug("Alert failed:", e);
+        }
+
+        // Build a serializable file payload to emit
+        const filePayload = {
+          id: activeFile.id,
+          name: activeFile.name,
+          content: activeFile.content,
+          language: activeFile.language,
+          folder: activeFile.folder,
+          createdAt: new Date().toISOString(),
+        };
+
+        console.debug("Save response:", res?.data, "emitting savedCode with:", filePayload, "roomId:", roomId);
+
+        // Notify other users in the room that this file was saved
+        try {
+          if (socket && socket.connected) {
+            socket.emit("savedCode", {
+              file: filePayload,
+              roomId: roomId,
+              username: user?.username,
+              userId: user?._id,
+            });
+          } else {
+            console.warn("Socket not connected, cannot emit savedCode");
+          }
+        } catch (e) {
+          console.debug("Failed to emit savedCode event:", e);
+        }
       } else {
         alert("Failed to save file");
       }
