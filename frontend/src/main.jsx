@@ -6,18 +6,20 @@ import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./lib/auth";
 import { RoomProvider } from "./context/RoomContext.jsx";
 import { SocketProvider } from "./context/SocketContext.jsx";
+import { ThemeProvider } from "./context/ThemeContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
-      <RoomProvider>
-      <AuthProvider>
-        <SocketProvider>
-
-            <App />
-        </SocketProvider>
-      </AuthProvider>
-      </RoomProvider>
+      <ThemeProvider>
+        <RoomProvider>
+          <AuthProvider>
+            <SocketProvider>
+              <App />
+            </SocketProvider>
+          </AuthProvider>
+        </RoomProvider>
+      </ThemeProvider>
     </BrowserRouter>
   </StrictMode>
 );

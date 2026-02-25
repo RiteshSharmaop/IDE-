@@ -43,6 +43,15 @@ exports.createFile = async (req, res) => {
     }
     const userId = req.user?.id || req.user?._id;
 
+    // Enforce free user file creation limit
+    const userDoc = await User.findById(userId).select('plan filesCreated');
+    if (userDoc && userDoc.plan !== 'premium' && (userDoc.filesCreated || 0) >= 5) {
+      return res.status(403).json({
+        success: false,
+        message: 'File creation limit reached for free users. Upgrade to premium for unlimited files.'
+      });
+    }
+
     // TODO: "Check file with name for the user is already exists or not"
     const alreadyExists = await File.findOne({
       $and: [{ name }, { userId }],
@@ -93,6 +102,36 @@ exports.createFile = async (req, res) => {
       message: "Error creating file",
       error: error.message,
     });
+  }
+};
+
+// @desc    Save file snapshot to Redis
+// @route   POST /api/files/save-redis
+exports.saveToRedis = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    const { file } = req.body;
+    if (!file) {
+      return res.status(400).json({ success: false, message: 'File payload required' });
+    }
+
+    const client = getRedisClient();
+    if (!client) {
+      return res.status(503).json({ success: false, message: 'Redis not available' });
+    }
+
+    const key = `user:${userId}:snapshot:${file.name || file.id || Date.now()}`;
+    await client.setEx(key, 3600, JSON.stringify({ file, savedAt: new Date() }));
+
+    // Maintain a simple index of saved snapshots for the user
+    const indexKey = `user:${userId}:snapshots`;
+    await client.lPush(indexKey, key);
+    await client.expire(indexKey, 3600);
+
+    return res.json({ success: true, message: 'Saved to Redis', data: { key } });
+  } catch (error) {
+    console.error('Save to Redis error:', error);
+    return res.status(500).json({ success: false, message: 'Error saving to Redis' });
   }
 };
 

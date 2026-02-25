@@ -9,6 +9,7 @@ const {
   deleteFile,
   saveFileToRoom,
   getRoomFiles,
+  saveToRedis,
 } = require("../controllers/fileController");
 const { protect } = require("../middleware/auth");
 
@@ -41,6 +42,11 @@ router.delete("/:id", protect, deleteFile);
 // @desc    Save file to room
 // @access  Private
 router.post("/:fileId/save-to-room/:roomId", protect, saveFileToRoom);
+
+// @route   POST /api/files/save-redis
+// @desc    Save a code snapshot to Redis
+// @access  Private
+router.post('/save-redis', protect, saveToRedis);
 
 // @route   GET /api/files/room/:roomId
 // @desc    Get all files in a room

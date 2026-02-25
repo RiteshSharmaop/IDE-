@@ -39,12 +39,7 @@ export const MonacoEditor = ({
 
   return (
     <div
-      className={`h-full rounded-lg overflow-hidden transition-all duration-200 relative
-        ${
-          theme === "dark"
-            ? `border-2 border-[${colors.dark.bg}] focus-within:ring-1 focus-within:ring-[${colors.dark.bg}]`
-            : `border-2 border-[${colors.dark.bg}] focus-within:ring-1 focus-within:ring-gray-700`
-        }`}
+      className={`h-full overflow-hidden transition-all duration-200 relative`}
     >
       <Editor
         height="100%"
