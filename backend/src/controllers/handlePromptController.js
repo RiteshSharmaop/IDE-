@@ -3,12 +3,21 @@ const Chat = require('../models/Chat');
 const { agentResponseService, multiLLMConsolidate, AVAILABLE_MODELS } = require('../services/agentReplyService');
 const { getMultiLLMResult } = require('./multiLLM.controller');
 
+const getRecentConversationHistory = async (chatId, limit = 20) => {
+  if (!chatId) return [];
+  return Message.find({ chatId })
+    .sort({ createdAt: 1 })
+    .limit(limit);
+};
+
 // Handle single LLM prompt
 exports.handlePrompt = async (req, res) => {
   try {
     const { chatId, prompt, model } = req.body;
     console.log("Received prompt:", { chatId, prompt, model });
     const userId = req.user._id;
+
+    const conversationHistory = await getRecentConversationHistory(chatId);
 
     // Save user message
     const userMessage = new Message({
@@ -20,8 +29,8 @@ exports.handlePrompt = async (req, res) => {
     });
     await userMessage.save();
 
-    // Get response from selected model
-    const response = await agentResponseService(prompt, model);
+    // Get response from selected model using prior chat history
+    const response = await agentResponseService(prompt, model, '', conversationHistory);
 
     if (!response.success) {
       return res.status(500).json({ success: false, error: response.error });
@@ -184,6 +193,8 @@ exports.handleMultiLLMPrompt = async (req, res) => {
   console.log("start handling multi-LLM prompt... ");
 
   try {
+    const conversationHistory = await getRecentConversationHistory(chatId);
+
     // Save user message
     console.log("User message saving...");
     const userMessage = await Message.create({
@@ -196,10 +207,10 @@ exports.handleMultiLLMPrompt = async (req, res) => {
     console.log("User message saved");
 
     console.log("Fetching responses from models...");
-    // Get responses from all models in parallel
+    // Get responses from all models in parallel using prior chat history
     const modelPromises = models.map((m) =>
       console.log(`Requesting response from model: ${m}`) ||
-      agentResponseService(prompt, m).catch((err) => ({ success: false, model: m, error: err.message }))
+      agentResponseService(prompt, m, '', conversationHistory).catch((err) => ({ success: false, model: m, error: err.message }))
     );
 
     const responses = await Promise.all(modelPromises);

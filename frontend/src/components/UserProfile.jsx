@@ -78,7 +78,7 @@ const colors = {
 };
 
 const getThemeClasses = (theme) => {
-  const isDark = theme !== "white";
+  const isDark = theme === "dark";
   const c = isDark ? colors.dark : colors.light;
   return {
     bg: c.bg,
@@ -86,7 +86,7 @@ const getThemeClasses = (theme) => {
     textSecondary: c.textMuted,
     textTertiary: c.textDim,
     border: c.border,
-    headerBg: isDark ? c.bgSecondary : c.bgSecondary,
+    headerBg: c.bgSecondary,
     sidebarText: c.text,
     sidebarTextInactive: c.textMuted,
     inputBg: c.bgTertiary,
@@ -239,7 +239,7 @@ function OverviewPage({ user, orders, addresses, setActivePage, theme }) {
       {/* Plan + meta */}
       <div className="flex items-center gap-3 mb-6">
         <span style={{ color: themeClasses.textSecondary }} className="text-sm">Plan:</span>
-        <span style={{ backgroundColor: theme === "white" ? "#F3F4F6" : colors.dark.bgTertiary, color: themeClasses.text }} className="text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">
+        <span style={{ backgroundColor: theme === "light" ? "#F3F4F6" : colors.dark.bgTertiary, color: themeClasses.text }} className="text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">
           {user.plan || "Free"}
         </span>
       </div>
@@ -376,7 +376,7 @@ function ProfilePage({ user, setUser, roomId, theme }) {
       {/* Read-only info */}
       <div style={{ borderColor: themeClasses.border }} className="py-5 border-b">
         <p style={{ color: themeClasses.textTertiary }} className="text-[11px] font-semibold tracking-[0.12em] uppercase mb-1">PLAN</p>
-        <span style={{ backgroundColor: theme === "white" ? "#F3F4F6" : colors.dark.bgTertiary, color: themeClasses.text }} className="text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">
+        <span style={{ backgroundColor: theme === "light" ? "#F3F4F6" : colors.dark.bgTertiary, color: themeClasses.text }} className="text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">
           {user.plan || "Free"}
         </span>
       </div>

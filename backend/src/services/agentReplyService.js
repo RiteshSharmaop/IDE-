@@ -21,7 +21,7 @@ const MODEL_ALIASES = {
   'claude-3.5': 'baidu/cobuddy:free'
 };
 
-const agentResponseService = async (prompt, model = 'openai/gpt-4o-mini', systemPrompt = '') => {
+const agentResponseService = async (prompt, model = 'openai/gpt-4o-mini', systemPrompt = '', history = []) => {
   try {
     if (!OPENROUTER_API_KEY) {
       throw new Error('OPENROUTER_API_KEY is not configured');
@@ -39,21 +39,35 @@ const agentResponseService = async (prompt, model = 'openai/gpt-4o-mini', system
     };
 
     const resolvedModel = resolveModel(model);
+    const memoryPrompt = systemPrompt || 'You are a helpful AI assistant. Remember the conversation history, refer back to earlier messages when relevant, and preserve context across turns.';
+    const recentHistory = Array.isArray(history) ? history.slice(-20) : [];
+
+    const messages = [
+      {
+        role: 'system',
+        content: memoryPrompt
+      }
+    ];
+
+    recentHistory.forEach((message) => {
+      if (!message || !message.content) return;
+      const role = message.type === 'user' ? 'user' : 'assistant';
+      messages.push({
+        role,
+        content: String(message.content)
+      });
+    });
+
+    messages.push({
+      role: 'user',
+      content: prompt
+    });
 
     const response = await axios.post(
       OPENROUTER_API_URL,
       {
         model: resolvedModel,
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt || 'You are a helpful AI assistant.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
+        messages,
         temperature: 0.7,
         max_tokens: 2000
       },

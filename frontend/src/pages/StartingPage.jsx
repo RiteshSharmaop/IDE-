@@ -5,12 +5,16 @@ import VariableProximity from "../components/VariableProximity";
 import logo from "../assets/logo.png";
 import LiquidEther from "../components/LiquidEther";
 import { Link } from "react-router-dom";
+import ThemeToggleButton from "../components/ThemeToggleButton";
 
 import { useSocket } from "../context/SocketContext";
+import { useTheme } from "../context/ThemeContext";
 
 const StartingPage = () => {
     const containerRef = useRef(null);
     const {socket , socketId} = useSocket();
+    const { theme } = useTheme();
+    const isDark = theme === "dark";
 
     useEffect(() => {
         if (!socket) return;
@@ -26,7 +30,11 @@ const StartingPage = () => {
     const content =
         "HexaHub is a collaborative IDE\nbuilt for real-time coding,\nsharing, and teamwork.";
     return (
-        <div className="relative w-full h-screen overflow-hidden bg-[#06000F]">
+        <div className={`relative w-full h-screen overflow-hidden ${isDark ? "bg-[#06000F]" : "bg-[#F8FAFC]"}`}>
+            <div className="absolute right-4 top-4 z-30">
+                <ThemeToggleButton />
+            </div>
+
             {/* Light rays background */}
             <LightRays
                 raysOrigin="top-center"
@@ -61,7 +69,7 @@ const StartingPage = () => {
             </div> */}
 
             {/* Transparent navbar */}
-            <CardNav logo={logo} logoAlt="Company Logo" />
+            <CardNav theme={theme} logo={logo} logoAlt="Company Logo" />
 
             <div className="absolute inset-0 flex items-center justify-center">
                 <div ref={containerRef} className="text-center px-6">
@@ -73,14 +81,14 @@ const StartingPage = () => {
                         radius={150}
                         falloff="linear"
                         style={{ fontSize: "58px" }}
-                        className="text-white font-semibold tracking-wide text-2xl md:text-4xl cursor-pointer"
+                        className={`${isDark ? "text-white" : "text-[#0F172A]"} font-semibold tracking-wide text-2xl md:text-4xl cursor-pointer`}
                     />
                     {/* Sign in / Sign up buttons */}
                     <div className="mt-8 flex items-center justify-center gap-4">
                         <Link
                             to="/signin"
                             type="button"
-                            className="bg-white cursor-pointer hover:bg-[#cbcaca] text-black px-6 py-3 rounded-full font-medium shadow-sm hover:opacity-95"
+                            className={`${isDark ? "bg-white hover:bg-[#cbcaca] text-black" : "bg-slate-950 hover:bg-slate-800 text-white"} cursor-pointer px-6 py-3 rounded-full font-medium shadow-sm hover:opacity-95`}
                             aria-label="Sign in"
                         >
                             Sign In
@@ -89,7 +97,7 @@ const StartingPage = () => {
                         <Link
                             to="/signup"
                             type="button"
-                            className="bg-white/10 cursor-pointer text-white px-6 py-3 rounded-full font-medium border border-white/20 backdrop-blur-sm hover:bg-white/20"
+                            className={`${isDark ? "bg-white/10 text-white border border-white/20 hover:bg-white/20" : "bg-white text-slate-950 border border-slate-300 hover:bg-slate-100"} cursor-pointer px-6 py-3 rounded-full font-medium backdrop-blur-sm`}
                             aria-label="Sign up"
                         >
                             Sign Up

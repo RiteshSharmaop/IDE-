@@ -3,9 +3,13 @@ import UserProfile from "../components/UserProfile";
 import { apiClient } from "../lib/api";
 import { getUserRooms } from "../lib/roomApi";
 import { useAuth } from "../lib/auth";
+import { useTheme } from "../context/ThemeContext";
+import ThemeToggleButton from "../components/ThemeToggleButton";
 
 export default function ProfilePage() {
   const { user, setUser } = useAuth();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const [userFiles, setUserFiles] = useState([]);
   const [rooms, setRooms] = useState([]);
 
@@ -56,7 +60,10 @@ export default function ProfilePage() {
   }, []);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0A0A0F" }}>
+    <div className={`relative min-h-screen ${isDark ? "bg-[#0A0A0F] text-white" : "bg-[#F6F7FB] text-slate-900"}`}>
+      <div className="absolute right-4 top-4 z-30">
+        <ThemeToggleButton />
+      </div>
       <UserProfile
         user={user}
         userFiles={userFiles}

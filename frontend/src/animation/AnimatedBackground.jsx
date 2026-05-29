@@ -1,6 +1,8 @@
 import TextType from "./TextType";
 
-export default function AnimatedBackground() {
+export default function AnimatedBackground({ theme = "dark" }) {
+  const isDark = theme === "dark";
+
   return (
     <div className="absolute inset-0 flex items-center justify-center overflow-hidden z-0 pointer-events-none">
       <TextType
@@ -22,6 +24,7 @@ export default function AnimatedBackground() {
         pauseDuration={3000}
         loop
         fontFamily="'BitcountPropDoubleInk', sans-serif"
+        textColors={isDark ? ["#ffffff"] : ["#1f2937"]}
       />
     </div>
   );

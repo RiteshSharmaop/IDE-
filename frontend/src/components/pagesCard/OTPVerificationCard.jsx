@@ -14,10 +14,12 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { useSocket } from "../../context/SocketContext";
 import { useRoom } from "../../context/RoomContext";
+import { useTheme } from "../../context/ThemeContext";
 
 export function OTPVerificationCard() {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,7 +30,6 @@ export function OTPVerificationCard() {
   const navigate = useNavigate();
   const location = useLocation();
   const { signin } = useAuth();
-  const { socket } = useSocket();
   const { setRoomId } = useRoom();
   const inputRefs = useRef([]);
 
@@ -160,12 +161,16 @@ export function OTPVerificationCard() {
   };
 
   return (
-    <Card className="relative w-full max-w-sm bg-[#171717] text-[#D0D0D0] border border-[#3E3F3E] shadow-lg z-10">
+    <Card className={`relative w-full max-w-lg shadow-lg z-10 border ${
+      isDark
+        ? "bg-[#171717] text-[#D0D0D0] border-[#3E3F3E]"
+        : "bg-white text-slate-900 border-slate-200"
+    }`}>
       <CardHeader>
-        <CardTitle className="text-white text-xl font-semibold">
+        <CardTitle className={isDark ? "text-white text-xl font-semibold" : "text-slate-950 text-xl font-semibold"}>
           Verify Your Email
         </CardTitle>
-        <CardDescription className="text-[#D0D0D0]">
+        <CardDescription className={isDark ? "text-[#D0D0D0]" : "text-slate-600"}>
           Enter the 6-digit OTP sent to {email}
         </CardDescription>
       </CardHeader>
@@ -175,7 +180,7 @@ export function OTPVerificationCard() {
           <div className="flex flex-col gap-6">
             {/* OTP Input Fields */}
             <div className="grid gap-2">
-              <Label className="text-[#D0D0D0]">Enter OTP</Label>
+              <Label className={isDark ? "text-[#D0D0D0]" : "text-slate-700"}>Enter OTP</Label>
               <div className="flex gap-2 justify-center">
                 {otp.map((digit, index) => (
                   <Input
@@ -188,12 +193,15 @@ export function OTPVerificationCard() {
                     onChange={(e) => handleOTPChange(index, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(index, e)}
                     onPaste={index === 0 ? handlePaste : undefined}
-                    className="w-12 h-12 text-center text-xl font-bold bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0] placeholder-[#3E3F3E] focus:ring-[#D0D0D0] focus:border-[#D0D0D0]"
+                    className={isDark
+                      ? "w-12 h-12 text-center text-xl font-bold bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0] placeholder-[#3E3F3E] focus:ring-[#D0D0D0] focus:border-[#D0D0D0]"
+                      : "w-12 h-12 text-center text-xl font-bold bg-slate-50 border border-slate-300 text-slate-900 placeholder-slate-400 focus:ring-slate-500 focus:border-slate-500"
+                    }
                     placeholder="-"
                   />
                 ))}
               </div>
-              <p className="text-xs text-[#7f8c8d] text-center">
+              <p className={`text-xs text-center ${isDark ? "text-[#7f8c8d]" : "text-slate-500"}`}>
                 OTP is valid for 10 minutes
               </p>
             </div>
@@ -206,7 +214,10 @@ export function OTPVerificationCard() {
           type="submit"
           onClick={handleVerifyOTP}
           disabled={loading || otp.join("").length !== 6}
-          className="w-full cursor-pointer hover:bg-[#3E3F3E] bg-white text-black hover:text-[#D0D0D0]"
+          className={isDark
+            ? "w-full cursor-pointer hover:bg-[#3E3F3E] bg-white text-black hover:text-[#D0D0D0]"
+            : "w-full cursor-pointer bg-slate-900 text-white hover:bg-slate-800"
+          }
         >
           {loading ? "Verifying..." : "Verify OTP"}
         </Button>
@@ -221,7 +232,10 @@ export function OTPVerificationCard() {
           onClick={handleResendOTP}
           disabled={resendLoading || resendTimer > 0}
           variant="outline"
-          className="w-full cursor-pointer border border-[#3E3F3E] bg-[#3e3f3eaf] hover:bg-[#6260608e] text-white hover:text-white"
+          className={isDark
+            ? "w-full cursor-pointer border border-[#3E3F3E] bg-[#3e3f3eaf] hover:bg-[#6260608e] text-white hover:text-white"
+            : "w-full cursor-pointer border border-slate-300 bg-white hover:bg-slate-100 text-slate-900"
+          }
         >
           {resendLoading ? "Sending..." : resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend OTP"}
         </Button>
@@ -230,7 +244,7 @@ export function OTPVerificationCard() {
           type="button"
           variant="link"
           onClick={() => navigate("/signup")}
-          className="text-[#D0D0D0] cursor-pointer hover:text-white text-sm"
+          className={isDark ? "text-[#D0D0D0] cursor-pointer hover:text-white text-sm" : "text-slate-700 cursor-pointer hover:text-slate-950 text-sm"}
         >
           Back to Sign Up
         </Button>

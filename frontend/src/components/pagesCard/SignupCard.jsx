@@ -17,8 +17,11 @@ import { useAuth } from "../../lib/auth";
 import { useSocket } from "../../context/SocketContext";
 import { useRoom } from "../../context/RoomContext";
 import { Eye, EyeOff } from "lucide-react";
+import { useTheme } from "../../context/ThemeContext";
 
 export function SignupCard() {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -87,12 +90,16 @@ export function SignupCard() {
     }
   };
   return (
-    <Card className="relative w-full max-w-sm bg-[#171717] text-[#D0D0D0] border border-[#3E3F3E] shadow-lg z-10">
+    <Card className={`relative w-full max-w-lg shadow-lg z-10 border ${
+      isDark
+        ? "bg-[#171717] text-[#D0D0D0] border-[#3E3F3E]"
+        : "bg-white text-slate-900 border-slate-200"
+    }`}>
       <CardHeader>
-        <CardTitle className="text-white text-xl font-semibold">
+        <CardTitle className={isDark ? "text-white text-xl font-semibold" : "text-slate-950 text-xl font-semibold"}>
           Create an account
         </CardTitle>
-        <CardDescription className="text-[#D0D0D0]">
+        <CardDescription className={isDark ? "text-[#D0D0D0]" : "text-slate-600"}>
           Enter your details to sign up and get started
         </CardDescription>
       </CardHeader>
@@ -102,7 +109,7 @@ export function SignupCard() {
           <div className="flex flex-col gap-6">
             {/* Username Field */}
             <div className="grid gap-2">
-              <Label htmlFor="username" className="text-[#D0D0D0]">
+              <Label htmlFor="username" className={isDark ? "text-[#D0D0D0]" : "text-slate-700"}>
                 Username
               </Label>
               <Input
@@ -112,13 +119,16 @@ export function SignupCard() {
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="yourusername"
                 required
-                className="bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0] placeholder-[#3E3F3E] focus:ring-[#D0D0D0]"
+                className={isDark
+                  ? "bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0] placeholder-[#3E3F3E] focus:ring-[#D0D0D0]"
+                  : "bg-slate-50 border border-slate-300 text-slate-900 placeholder-slate-400 focus:ring-slate-500"
+                }
               />
             </div>
 
             {/* Email Field */}
             <div className="grid gap-2">
-              <Label htmlFor="email" className="text-[#D0D0D0]">
+              <Label htmlFor="email" className={isDark ? "text-[#D0D0D0]" : "text-slate-700"}>
                 Email
               </Label>
               <Input
@@ -128,24 +138,18 @@ export function SignupCard() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="m@example.com"
                 required
-                className="bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0] placeholder-[#3E3F3E] focus:ring-[#D0D0D0]"
+                className={isDark
+                  ? "bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0] placeholder-[#3E3F3E] focus:ring-[#D0D0D0]"
+                  : "bg-slate-50 border border-slate-300 text-slate-900 placeholder-slate-400 focus:ring-slate-500"
+                }
               />
             </div>
 
             {/* Password Field */}
             <div className="grid gap-2">
-              <Label htmlFor="password" className="text-[#D0D0D0]">
+              <Label htmlFor="password" className={isDark ? "text-[#D0D0D0]" : "text-slate-700"}>
                 Password
               </Label>
-              {/* <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="********"
-                required
-                className="bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0] placeholder-[#3E3F3E] focus:ring-[#D0D0D0]"
-              /> */}
               <div className="relative">
                 <Input
                   id="password"
@@ -154,15 +158,17 @@ export function SignupCard() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="********"
                   autoComplete="new-password"
-                  className="bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0]
-               placeholder-[#3E3F3E] focus:ring-[#D0D0D0] pr-10"
+                  className={isDark
+                    ? "bg-[#212121] border border-[#3E3F3E] text-[#D0D0D0] placeholder-[#3E3F3E] focus:ring-[#D0D0D0] pr-10"
+                    : "bg-slate-50 border border-slate-300 text-slate-900 placeholder-slate-400 focus:ring-slate-500 pr-10"
+                  }
                 />
 
                 <span
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2
-               cursor-pointer text-[#D0D0D0] hover:text-white
-               select-none"
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer select-none ${
+                    isDark ? "text-[#D0D0D0] hover:text-white" : "text-slate-500 hover:text-slate-900"
+                  }`}
                   role="button"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
@@ -179,14 +185,20 @@ export function SignupCard() {
           type="submit"
           onClick={handleSignup}
           disabled={loading}
-          className="w-full cursor-pointer hover:bg-[#3E3F3E] bg-white text-black hover:text-[#D0D0D0]"
+          className={isDark
+            ? "w-full cursor-pointer hover:bg-[#3E3F3E] bg-white text-black hover:text-[#D0D0D0]"
+            : "w-full cursor-pointer bg-slate-900 text-white hover:bg-slate-800"
+          }
         >
           {loading ? "Signing up..." : "Sign Up"}
         </Button>
         {error && <div className="text-sm text-red-400 mt-2">{error}</div>}
         <Button
           variant="outline"
-          className="w-full cursor-pointer border border-[#3E3F3E] bg-[#3e3f3eaf] hover:bg-[#6260608e] text-white hover:text-white"
+          className={isDark
+            ? "w-full cursor-pointer border border-[#3E3F3E] bg-[#3e3f3eaf] hover:bg-[#6260608e] text-white hover:text-white"
+            : "w-full cursor-pointer border border-slate-300 bg-white hover:bg-slate-100 text-slate-900"
+          }
           onClick={() => {
             navigate("/not-found");
           }}
@@ -197,7 +209,7 @@ export function SignupCard() {
           <Link to="/signin">
             <Button
               variant="link"
-              className="text-[#D0D0D0] cursor-pointer hover:text-white"
+              className={isDark ? "text-[#D0D0D0] cursor-pointer hover:text-white" : "text-slate-700 cursor-pointer hover:text-slate-950"}
             >
               Already have an account? Login
             </Button>
