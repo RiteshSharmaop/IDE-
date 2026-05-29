@@ -51,6 +51,7 @@ import ShareDialog from "../components/ShareDialog";
 import CheckboxInTable from "../components/CheckboxInTable";
 import RoomsSidebar from "../components/RoomsSidebar";
 import UserProfile from "../components/UserProfile";
+import PaymentModal from "../components/PaymentModal";
 import {
   getUserRooms,
   createUserRoom,
@@ -61,12 +62,11 @@ import AccountPage from "../components/UserProfile";
 
 const CodeIDE = () => {
   const { theme, setTheme } = useTheme();
-  const [files, setFiles] = useState([
+  const defaultFiles = [
     {
       id: 1,
       name: "main.js",
-      content:
-        '// Write your JavaScript code here\nconsole.log("Hello World");',
+      content: '// Write your JavaScript code here\nconsole.log("Hello World");',
       language: "javascript",
       folder: "src",
     },
@@ -85,12 +85,41 @@ const CodeIDE = () => {
       language: "cpp",
       folder: "dsa",
     },
-  ]);
-  const [activeFile, setActiveFile] = useState(files[0]);
-  const [openFiles, setOpenFiles] = useState([files[0]]);
+  ];
+
+  const loadInitialState = () => {
+    try {
+      const raw = localStorage.getItem("ide_state_v1");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return {
+          files: parsed.files || defaultFiles,
+          openFiles: parsed.openFiles || (parsed.files ? [parsed.files[0]] : [defaultFiles[0]]),
+          activeFile: parsed.activeFile || (parsed.files ? parsed.files[0] : defaultFiles[0]),
+          folders: parsed.folders || ["src", "dsa"],
+          expandedFolders: parsed.expandedFolders || { src: true, dsa: true },
+        };
+      }
+    } catch (e) {
+      console.debug("Failed to parse saved IDE state:", e);
+    }
+    return {
+      files: defaultFiles,
+      openFiles: [defaultFiles[0]],
+      activeFile: defaultFiles[0],
+      folders: ["src", "dsa"],
+      expandedFolders: { src: true, dsa: true },
+    };
+  };
+
+  const initial = loadInitialState();
+  const [files, setFiles] = useState(initial.files);
+  const [activeFile, setActiveFile] = useState(initial.activeFile);
+  const [openFiles, setOpenFiles] = useState(initial.openFiles);
   const [isCreatingFile, setIsCreatingFile] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFileName, setNewFileName] = useState("");
+  const [paymentAlert, setPaymentAlert] = useState(null);
   const [newFolderName, setNewFolderName] = useState("");
   const [selectedFolder, setSelectedFolder] = useState("src");
   const [terminalTab, setTerminalTab] = useState("terminal");
@@ -103,11 +132,8 @@ const CodeIDE = () => {
   const [terminalInputValue, setTerminalInputValue] = useState("");
   const [terminalVisible, setTerminalVisible] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [expandedFolders, setExpandedFolders] = useState({
-    src: true,
-    dsa: true,
-  });
-  const [folders, setFolders] = useState(["src", "dsa"]); // Track all folders
+  const [expandedFolders, setExpandedFolders] = useState(initial.expandedFolders);
+  const [folders, setFolders] = useState(initial.folders); // Track all folders
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
@@ -121,6 +147,7 @@ const CodeIDE = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [remoteCursors, setRemoteCursors] = useState(new Map()); // Track remote user cursors
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const navigate = useNavigate();
   // Mock user data
@@ -382,6 +409,48 @@ const CodeIDE = () => {
       socket.off("remoteCursorMoved");
     };
   }, [socket]);
+
+  // --- Persistence: restore editor state on mount and save on changes ---
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("ide_state_v1");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.files && Array.isArray(parsed.files) && parsed.files.length) {
+          setFiles(parsed.files);
+        }
+        if (parsed.openFiles && Array.isArray(parsed.openFiles) && parsed.openFiles.length) {
+          setOpenFiles(parsed.openFiles);
+        }
+        if (parsed.activeFile) {
+          setActiveFile(parsed.activeFile);
+        }
+        if (parsed.folders && Array.isArray(parsed.folders)) {
+          setFolders(parsed.folders);
+        }
+        if (parsed.expandedFolders) {
+          setExpandedFolders(parsed.expandedFolders);
+        }
+      }
+    } catch (e) {
+      console.debug("Failed to restore IDE state:", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    const snapshot = {
+      files,
+      openFiles,
+      activeFile,
+      folders,
+      expandedFolders,
+    };
+    try {
+      localStorage.setItem("ide_state_v1", JSON.stringify(snapshot));
+    } catch (e) {
+      console.debug("Failed to save IDE state:", e);
+    }
+  }, [files, openFiles, activeFile, folders, expandedFolders]);
 
   // Ref to track if we've already attempted to rejoin on mount
   const hasRejoinedRef = useRef(false);
@@ -1151,7 +1220,15 @@ const CodeIDE = () => {
   }, {});
 
   useEffect(() => {
-    //console.log(user);
+    const storedAlert = localStorage.getItem("paymentAlert");
+    if (storedAlert) {
+      try {
+        setPaymentAlert(JSON.parse(storedAlert));
+      } catch (err) {
+        console.error("Failed to parse payment alert:", err);
+      }
+      localStorage.removeItem("paymentAlert");
+    }
   }, []);
 
   return (
@@ -1442,6 +1519,10 @@ const CodeIDE = () => {
                         onMouseLeave={(e) => {
                           e.currentTarget.style.backgroundColor = "transparent";
                         }}
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          setShowPaymentModal(true);
+                        }}
                       >
                         <div
                           className="flex h-9 w-9 items-center justify-center rounded-lg"
@@ -1630,6 +1711,33 @@ const CodeIDE = () => {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
+          {paymentAlert && (
+            <div className="mx-4 mt-4 rounded-2xl border px-4 py-3 shadow-sm"
+              style={{
+                borderColor:
+                  paymentAlert.type === "success" ? "#bbf7d0" : "#fecaca",
+                backgroundColor:
+                  paymentAlert.type === "success" ? "#ecfccb" : "#fee2e2",
+                color:
+                  paymentAlert.type === "success" ? "#166534" : "#991b1b",
+              }}
+            >
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-semibold">
+                    {paymentAlert.type === "success" ? "Payment Success" : "Payment Failed"}
+                  </p>
+                  <p className="text-sm mt-1">{paymentAlert.message}</p>
+                </div>
+                <button
+                  onClick={() => setPaymentAlert(null)}
+                  className="text-sm font-semibold opacity-80 hover:opacity-100"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
           {/* Top Bar */}
           <header
             className="flex items-center justify-between px-1 h-16  border-b"
@@ -1760,7 +1868,7 @@ const CodeIDE = () => {
     </button>
 
     <Link
-      to="https://brainmash-1.onrender.com"
+      to="/chat"
       className="flex items-center gap-2 px-4 py-2 rounded-lg transition-all hover:opacity-70"
       style={{ backgroundColor: c.bgTertiary }}
     >
@@ -2285,6 +2393,14 @@ const CodeIDE = () => {
       </div>
       {/* // In your CodeIDE component, add this before the closing div: */}
       <AIAssistantSidebar theme={theme} activeFile={activeFile} onInsertCode={handleInsertCode} />
+
+      {/* Payment Modal */}
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        theme={theme}
+        colors={{ dark: c, light: c }}
+      />
 
       {!sidebarCollapsed && showNotifications && (
         <div

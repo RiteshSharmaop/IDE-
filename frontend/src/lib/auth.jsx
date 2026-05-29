@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import api from "./api";
 import { useNavigate } from "react-router-dom";
-import { useRoom } from "../context/RoomContext";
 
 const AuthContext = createContext(null);
 
@@ -25,8 +24,7 @@ export function AuthProvider({ children }) {
   });
 
   const [loading, setLoading] = useState(true);
-
-  const { roomId, setRoomId } = useRoom();
+  const [roomId, setRoomId] = useState("");
 
   useEffect(() => {
     const init = async () => {
@@ -105,7 +103,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, signin, signout, loading }}>
+    <AuthContext.Provider value={{ user, setUser, signin, signout, loading, roomId, setRoomId }}>
       {children}
     </AuthContext.Provider>
   );
@@ -144,8 +142,7 @@ export function ProtectedRoute({ children }) {
 
 
 export function PublicRoute({ children }) {
-  const { user, loading } = useAuth();
-  const {roomId} = useRoom();
+  const { user, loading, roomId } = useAuth();
   const roomIdFromStorage = localStorage.getItem("roomId");
 
   if (loading) return null;

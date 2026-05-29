@@ -3,8 +3,9 @@
 
 import axios from "axios";
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 const API = axios.create({
-  baseURL: import.meta.env.VITE_BACKEND_URL || "http://localhost:8080/api",
+  baseURL: `${BACKEND_URL}/api`,
 });
 
 // Add request interceptor to include authentication token

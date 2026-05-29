@@ -10,6 +10,11 @@ import IDE from "./pages/IDE";
 import IDE2 from "./pages/IDE2";
 import ShareDialog from "./components/ShareDialog";
 import ProfilePage from "./pages/ProfilePage";
+import BrainMesh from "./pages/BrainMesh";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentCancel from "./pages/PaymentCancel";
+// import ExportBM from "../../brainmesh/Frontend/src/ExportBM";
+// const Chat = ExportBM().Home
 
 function App() {
   return (
@@ -49,11 +54,26 @@ function App() {
         />
         <Route path="/share" element={<ShareDialog />} />
         <Route path="/not-found" element={<NotFound />} />
+        {/* <Route path='/chat' element={
+          <ProtectedRoute>
+            <Home paymentDone={paymentDone} setPaymentDone={setPaymentDone}  />
+          </ProtectedRoute>
+        } /> */}
         <Route
           path="/profile"
           element={
             <ProtectedRoute>
               <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/payment-success" element={<PaymentSuccess />} />
+        <Route path="/payment-cancel" element={<PaymentCancel />} />
+        <Route
+          path="/chat"
+          element={
+            <ProtectedRoute>
+              <BrainMesh />
             </ProtectedRoute>
           }
         />

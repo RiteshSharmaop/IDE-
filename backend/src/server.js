@@ -17,17 +17,24 @@ const notificationRoutes = require("./routes/notifications");
 const ideRoutes = require("./routes/ide");
 const llmRoutes = require("./routes/llm");
 const usersRoutes = require("./routes/users");
+const chatRoutes = require("./routes/chat");
+const promptRoutes = require("./routes/prompt");
+const paymentRoutes = require("./routes/payment");
 
 // Create Express app and HTTP server
 const app = express();
 const httpServer = createServer(app);
 
 // Connect to databases
-const { connectRedisCloud } = require("./config/redis");
 
 connectDB();
+console.log("Trying Connecting to DB");
+console.log("Trying Connecting to Redis");
+
+const { connectRedisCloud , connectRedis} = require("./config/redis");
 // Connect to Redis (reads REDIS_HOST and REDIS_PORT from env; defaults to localhost:6379)
-connectRedisCloud();
+connectRedis();
+// connectRedis()  
 
 // Middleware
 app.use(helmet());
@@ -58,6 +65,9 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/ide", ideRoutes);
 app.use("/api/llm", llmRoutes);
 app.use("/api/users", usersRoutes);
+app.use("/api/chat", chatRoutes);
+app.use("/api/prompt", promptRoutes);
+app.use("/api/payment", paymentRoutes);
 
 // Health check route
 app.get("/api/health", (req, res) => {

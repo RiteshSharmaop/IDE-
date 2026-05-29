@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useRoom } from "../context/RoomContext";
 import { useSocket } from "../context/SocketContext";
 import { useTheme } from "../context/ThemeContext";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Copy, Check } from "lucide-react";
 import { useAuth } from "../lib/auth";
 
 // ─── Mock data (replace with your real API data) ──────────────────────────────
@@ -446,6 +446,18 @@ function AddressesPage({ addresses, theme }) {
 function OrdersPage({ orders, setOrders, theme }) {
   const themeClasses = getThemeClasses(theme);
   console.log("📦 OrdersPage received orders:", orders, "orders.length:", orders?.length);
+  const [copiedId, setCopiedId] = useState(null);
+
+  const handleCopy = (text, id) => {
+    if (!text) return;
+    try {
+      navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (e) {
+      console.error("Copy failed:", e);
+    }
+  };
   return (
     <div className="max-w-2xl">
       <h1 style={{ color: themeClasses.text }} className="text-3xl font-bold mb-2">Saved Code</h1>
@@ -460,9 +472,21 @@ function OrdersPage({ orders, setOrders, theme }) {
             console.log(`📌 Rendering order ${idx}:`, o);
             return (
               <div key={o.id || idx} style={{ borderColor: themeClasses.border, backgroundColor: themeClasses.inputBg }} className="border rounded px-4 py-3 text-sm flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <span style={{ color: themeClasses.text }} className="font-medium truncate">{o.name || o.id}</span>
-                  <span style={{ color: themeClasses.textSecondary, fontSize: 12 }}>{new Date(o.createdAt || o.date || Date.now()).toLocaleString()}</span>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <span style={{ color: themeClasses.text }} className="font-medium truncate block">{o.name || o.id}</span>
+                    <span style={{ color: themeClasses.textSecondary, fontSize: 12 }}>{new Date(o.createdAt || o.date || Date.now()).toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleCopy(o.content || o.preview || "", o.id || idx)}
+                      title="Copy code"
+                      style={{ color: themeClasses.text }}
+                      className="p-1 rounded hover:opacity-80"
+                    >
+                      {copiedId === (o.id || idx) ? <Check size={16} /> : <Copy size={16} />}
+                    </button>
+                  </div>
                 </div>
                 <div className="text-sm text-left" style={{ color: themeClasses.text }}>
                   <code className="block max-h-20 overflow-hidden text-xs whitespace-pre-wrap">{o.preview || (o.content || '').slice(0, 200)}</code>

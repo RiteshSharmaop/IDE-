@@ -1,0 +1,16 @@
+PORT=8000
+MONGODB_URI=
+CORS_ORIGIN=
+OPENROUTER_API_KEY=
+OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
+JWT_SECRET_EXPIRE=
+JWT_SECRET=
+
+# For development
+NODE_ENV=development
+
+# For production
+# NODE_ENV=production node server.js
+
+
+STRIPE_SECRET_KEY=

@@ -28,7 +28,7 @@ const createClientWithOptions = (opts = {}) => {
 const connectRedisLocal = async () => {
   try {
     redisClient = createClientWithOptions({
-      host: '127.0.0.1',
+      host: process.env.REDIS_LOCAL_HOST || '127.0.0.1',
       port: process.env.REDIS_LOCAL_PORT ? parseInt(process.env.REDIS_LOCAL_PORT) : 6379,
       connectTimeout: 3000,
       maxReconnectAttempts: 2,
@@ -56,11 +56,14 @@ const connectRedisLocal = async () => {
 // connect to redis using env vars (works for docker service, localhost, and cloud)
 const connectRedisCloud = async () => {
   try {
-    const host = process.env.REDIS_HOST || '127.0.0.1';
+    
+    const host = process.env.REDIS_HOST || 'redis';
     const port = process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT) : 6379;
     const password = process.env.REDIS_PASSWORD || undefined;
     const username = process.env.REDIS_USERNAME || undefined;
-
+    
+    // When running locally, REDIS_HOST may be set to localhost.
+    // When running under Docker Compose, REDIS_HOST should be the redis service name.
     console.log(`ℹ️  Connecting to Redis at ${host}:${port}...`);
 
     redisClient = createClientWithOptions({
@@ -168,6 +171,62 @@ const getCachedUser = async (userId) => {
   } catch (error) {
     console.error('Get cached user error:', error);
     return null;
+  }
+};
+
+/**
+ * Generic cache setter
+ * @param {string} key
+ * @param {any} value
+ * @param {number} ttl - seconds
+ */
+const setCache = async (key, value, ttl = 86400) => {
+  try {
+    const client = getRedisClient();
+    if (!client) return false;
+    const payload = typeof value === 'string' ? value : JSON.stringify(value);
+    await client.setEx(key, ttl, payload);
+    return true;
+  } catch (error) {
+    console.error('Set cache error:', error);
+    return false;
+  }
+};
+
+/**
+ * Generic cache getter
+ * @param {string} key
+ */
+const getCache = async (key) => {
+  try {
+    const client = getRedisClient();
+    if (!client) return null;
+    const data = await client.get(key);
+    if (!data) return null;
+    try {
+      return JSON.parse(data);
+    } catch {
+      return data;
+    }
+  } catch (error) {
+    console.error('Get cache error:', error);
+    return null;
+  }
+};
+
+/**
+ * Delete a cache key
+ * @param {string} key
+ */
+const deleteCache = async (key) => {
+  try {
+    const client = getRedisClient();
+    if (!client) return false;
+    await client.del(key);
+    return true;
+  } catch (error) {
+    console.error('Delete cache error:', error);
+    return false;
   }
 };
 
@@ -443,6 +502,9 @@ module.exports = {
   blacklistToken,
   isTokenBlacklisted,
   clearAllCache,
+  getCache,
+  setCache,
+  deleteCache,
   getCacheStats,
   redisClient
 };

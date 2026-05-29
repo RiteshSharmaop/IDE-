@@ -8,7 +8,7 @@ const MessageRenderer = ({ content, theme = 'dark', onInsertCode = null }) => {
     dark: {
       text: '#E0E0E0',
       codeBg: '#2D2D2D',
-      codeText: '#A9B7B7',
+      codeText: '#D4D4D4',
       buttonHover: '#3E3E42',
       success: '#4EC9B0',
       border: '#3E3E42',
@@ -89,6 +89,34 @@ const MessageRenderer = ({ content, theme = 'dark', onInsertCode = null }) => {
                 {match[1]}.
               </span>
               <span>{formatInlineMarkdown(match[2])}</span>
+            </div>
+          );
+          return;
+        }
+      }
+
+      // Headings (#, ##, ###)
+      if (/^#{1,6}\s/.test(trimmed)) {
+        const levelMatch = trimmed.match(/^(#{1,6})\s(.+)$/);
+        if (levelMatch) {
+          const level = levelMatch[1].length;
+          const content = levelMatch[2];
+          const fontSize = level === 1 ? '1.5rem' : level === 2 ? '1.25rem' : '1.05rem';
+          const marginTop = level === 1 ? '1rem' : '0.75rem';
+          const lineHeight = level === 1 ? '1.2' : '1.3';
+          elements.push(
+            <div
+              key={`${idx}-heading`}
+              style={{
+                marginTop,
+                fontWeight: '700',
+                fontSize,
+                color: c.text,
+                lineHeight,
+                letterSpacing: '-0.01em'
+              }}
+            >
+              {formatInlineMarkdown(content)}
             </div>
           );
           return;
@@ -193,6 +221,109 @@ const MessageRenderer = ({ content, theme = 'dark', onInsertCode = null }) => {
     return parts.length === 0 ? text : parts;
   };
 
+  const escapeHtml = (value) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  const tokenizeCode = (code) => {
+    const rules = [
+      {
+        type: 'comment',
+        regex: /\/\/.*$/gm,
+      },
+      {
+        type: 'comment',
+        regex: /\/\*[\s\S]*?\*\//g,
+      },
+      {
+        type: 'string',
+        regex: /(['"])(?:\\[\s\S]|(?!\1).)*\1/g,
+      },
+      {
+        type: 'include',
+        regex: /#include\s*<[^>]+>/g,
+      },
+      {
+        type: 'keyword',
+        regex: /\b(?:const|let|var|function|return|if|else|for|while|switch|case|break|continue|new|throw|catch|try|class|extends|constructor|static|import|from|export|default|async|await|typeof|instanceof|void|delete|public|private|protected|interface|enum|template|using|namespace|typedef)\b/g,
+      },
+      {
+        type: 'type',
+        regex: /\b(?:int|float|double|char|bool|void|size_t|long|short|unsigned|signed)\b/g,
+      },
+      {
+        type: 'builtin',
+        regex: /\b(?:true|false|null|undefined|std|cout|cin|endl|string|vector|map|unordered_map|set|unordered_set)\b/g,
+      },
+      {
+        type: 'number',
+        regex: /\b\d+(?:\.\d+)?\b/g,
+      },
+      {
+        type: 'function',
+        regex: /\b([a-zA-Z_][\w]*)\s*(?=\()/g,
+      },
+    ];
+
+    const tokens = [];
+    let remaining = code;
+
+    while (remaining.length > 0) {
+      let earliestMatch = null;
+      let earliestRule = null;
+
+      rules.forEach((rule) => {
+        rule.regex.lastIndex = 0;
+        const match = rule.regex.exec(remaining);
+        if (match && (earliestMatch === null || match.index < earliestMatch.index)) {
+          earliestMatch = match;
+          earliestRule = rule;
+        }
+      });
+
+      if (!earliestMatch) {
+        tokens.push({ type: 'plain', content: remaining });
+        break;
+      }
+
+      if (earliestMatch.index > 0) {
+        tokens.push({ type: 'plain', content: remaining.slice(0, earliestMatch.index) });
+      }
+
+      tokens.push({ type: earliestRule.type, content: earliestMatch[0] });
+      remaining = remaining.slice(earliestMatch.index + earliestMatch[0].length);
+    }
+
+    return tokens;
+  };
+
+  const getTokenStyle = (type) => {
+    switch (type) {
+      case 'comment':
+        return { color: '#6A9955' };
+      case 'string':
+        return { color: '#CE9178' };
+      case 'include':
+        return { color: '#C586C0', fontWeight: 700 };
+      case 'keyword':
+        return { color: '#569CD6', fontWeight: 700 };
+      case 'type':
+        return { color: '#4EC9B0', fontWeight: 600 };
+      case 'builtin':
+        return { color: '#9CDCFE' };
+      case 'number':
+        return { color: '#B5CEA8' };
+      case 'function':
+        return { color: '#DCDCAA' };
+      default:
+        return { color: c.codeText };
+    }
+  };
+
   const handleCopyCode = (code, index) => {
     navigator.clipboard.writeText(code);
     setCopiedIndex(index);
@@ -209,18 +340,19 @@ const MessageRenderer = ({ content, theme = 'dark', onInsertCode = null }) => {
             <div
               key={index}
               style={{
-                backgroundColor: c.codeBg,
+                backgroundColor: theme === 'dark' ? '#1E1E1E' : '#F3F4F6',
                 border: `1px solid ${c.border}`,
-                borderRadius: '6px',
+                borderRadius: '8px',
                 marginTop: '0.75rem',
                 marginBottom: '0.75rem',
                 overflow: 'hidden',
+                borderLeft: '4px solid #007ACC',
               }}
             >
               {/* Code Header */}
               <div
                 style={{
-                  backgroundColor: c.border,
+                  backgroundColor: theme === 'dark' ? '#252526' : '#E5E7EB',
                   padding: '0.5rem 0.75rem',
                   fontSize: '0.75rem',
                   textTransform: 'uppercase',
@@ -301,9 +433,16 @@ const MessageRenderer = ({ content, theme = 'dark', onInsertCode = null }) => {
                   fontFamily: "'Monaco', 'Menlo', 'Ubuntu Mono', monospace",
                   lineHeight: '1.5',
                   maxHeight: '300px',
+                  backgroundColor: theme === 'dark' ? '#1E1E1E' : '#FFFFFF',
                 }}
               >
-                <code>{part.content}</code>
+                <code>
+                  {tokenizeCode(part.content).map((token, tokenIndex) => (
+                    <span key={tokenIndex} style={getTokenStyle(token.type)}>
+                      {token.content}
+                    </span>
+                  ))}
+                </code>
               </pre>
             </div>
           );
